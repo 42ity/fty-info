@@ -12,8 +12,8 @@ os:
 
 sudo: false
 
-services:
-- docker
+#services:
+#- docker
 
 # Set CI_TIME=true to enable build-step profiling in Travis
 # Set CI_TRACE=true to enable shell script tracing in Travis
@@ -43,6 +43,8 @@ matrix:
         - git
         - asciidoc
         - xmlto
+        - gcc-4.9
+        - g++-4.9
 
 #       - libzmq3-dev
 #       - libczmq-dev
