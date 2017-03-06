@@ -43,8 +43,8 @@ matrix:
         - git
         - asciidoc
         - xmlto
-        - gcc-4.9
-        - g++-4.9
+        - gcc-4.8
+        - g++-4.8
 
 #       - libzmq3-dev
 #       - libczmq-dev
