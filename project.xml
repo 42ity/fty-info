@@ -37,6 +37,7 @@
     <class name = "ftyinfo" private="1" selftest="0">Class for keeping fty information</class>
     <class name = "linuxmetric" selftest="0">Class for finding out Linux system info</class>
     <class name = "fty-info-server">42ity info server</class>
+    <class name = "fty-info-rc0-runonce" private="1">Run once actor to update rackcontroller-0 (SN, ...)</class>
 
     <main  name = "fty-info" service = "1">Agent which returns rack controller information</main>
 

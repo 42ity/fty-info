@@ -25,9 +25,6 @@
 @discuss
 @end
 */
-#define TIMEOUT_MS -1   //wait infinitelly
-#define DEFAULT_UUID    "00000000-0000-0000-0000-000000000000"  //in case of UUID being NULL
-
 #include <string>
 #include <unistd.h>
 #include <bits/local_lim.h>
@@ -57,17 +54,7 @@ struct _fty_info_server_t {
     zhashx_t *history;
 };
 
-// Configuration accessors
-// FIXME: why do we need that? zconfig_get should already do this, no?
-const char*
-s_get (zconfig_t *config, const char* key, std::string &dfl) {
-    assert (config);
-    char *ret = zconfig_get (config, key, dfl.c_str());
-    if (!ret || streq (ret, ""))
-        return (char*)dfl.c_str();
-    return ret;
-}
-
+// this is kept for to handle with values set to ""
 const char*
 s_get (zconfig_t *config, const char* key, const char*dfl) {
     assert (config);
@@ -103,6 +90,7 @@ info_server_new (char *name)
     self->announce_test=false;
     self->metrics_test=false;
     self->history = zhashx_new();
+    self->resolver = topologyresolver_new (DEFAULT_RC_INAME);
     zhashx_set_destructor(self->history, history_destructor);
     zhashx_insert(self->history, HIST_CPU_NUMERATOR, numerator_ptr);
     zhashx_insert(self->history, HIST_CPU_DENOMINATOR, denominator_ptr);
@@ -495,7 +483,6 @@ fty_info_server (zsock_t *pipe, void *args)
     }
 
     fty_info_server_t *self = info_server_new (name);
-    self->resolver = topologyresolver_new (NULL);
     zpoller_t *poller = zpoller_new (pipe, mlm_client_msgpipe (self->client), NULL);
     assert (poller);
 

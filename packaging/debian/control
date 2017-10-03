@@ -21,7 +21,7 @@ Source:         fty-info
 Section:        net
 Priority:       optional
 Maintainer:     fty-info Developers <eatonipcopensource@eaton.com>
-Standards-Version: 4.0.0
+Standards-Version: 4.0.1.0
 Build-Depends: debhelper (>= 9),
     pkg-config,
     libzmq3-dev,
@@ -66,7 +66,7 @@ Description: runnable binaries from fty-info
 Package: fty-info-dbg
 Architecture: any
 Section: debug
-Priority: extra
+Priority: optional
 Depends:
     fty-info (= ${binary:Version}),
     ${misc:Depends}

@@ -133,6 +133,14 @@ int main (int argc, char *argv [])
     zstr_sendx (server, "LINUXMETRICSINTERVAL", str_linuxmetrics_interval, NULL);
     zstr_sendx (server, "PRODUCER", FTY_PROTO_STREAM_METRICS, NULL);
 
+    // Run once actor to fill data about rackcontroller-0
+    zactor_t *rc0_runonce = zactor_new (fty_info_rc0_runonce, (void*) actor_name);
+    if (verbose) {
+        zstr_sendx (rc0_runonce, "VERBOSE", NULL);
+    }
+    zstr_sendx (rc0_runonce, "CONNECT", endpoint, actor_name, NULL);
+    zstr_sendx (rc0_runonce, "CONSUMER", FTY_PROTO_STREAM_ASSETS, "device\\.rackcontroller.*", NULL);
+
     zloop_t *timer_loop = zloop_new();
     zloop_timer (timer_loop, linuxmetrics_interval * 1000, 0, s_linuxmetrics_event, server);
     zloop_start (timer_loop);
@@ -140,6 +148,7 @@ int main (int argc, char *argv [])
     // Cleanup
     zloop_destroy (&timer_loop);
     zactor_destroy (&server);
+    zactor_destroy (&rc0_runonce);
     zstr_free(&actor_name);
     zstr_free(&endpoint);
     zconfig_destroy (&config);
