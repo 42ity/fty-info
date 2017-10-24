@@ -166,32 +166,37 @@ handle_stream(fty_info_rc0_runonce_t *self, zmsg_t *msg)
     }
     data = fty_proto_ext_string(message, "description", NULL);
     if (NULL == data) {
-        if ((NULL != self->info->hostname) && (NULL != self->info->description) && (NULL != self->info->installDate)) {
-            fty_proto_ext_insert(message, "description", "%s\n%s\n%s",
+        if ((NULL != self->info->hostname && 0 != strcmp("", self->info->hostname))
+                && (NULL != self->info->description && 0 != strcmp("", self->info->description))
+                && (NULL != self->info->installDate && 0 != strcmp("", self->info->installDate))) {
+            fty_proto_ext_insert(message, "description", "%s %s %s",
                     self->info->hostname, self->info->description, self->info->installDate);
             change = 1;
         }
-        else if ((NULL != self->info->hostname) && (NULL != self->info->description)) {
-            fty_proto_ext_insert(message, "description", "%s\n%s", self->info->hostname, self->info->description);
+        else if ((NULL != self->info->hostname && 0 != strcmp("", self->info->hostname))
+                && (NULL != self->info->description && 0 != strcmp("", self->info->description))) {
+            fty_proto_ext_insert(message, "description", "%s %s", self->info->hostname, self->info->description);
             change = 1;
         }
-        else if ((NULL != self->info->hostname) && (NULL != self->info->installDate)) {
-            fty_proto_ext_insert(message, "description", "%s\n%s", self->info->hostname, self->info->installDate);
+        else if ((NULL != self->info->hostname && 0 != strcmp("", self->info->hostname))
+                && (NULL != self->info->installDate && 0 != strcmp("", self->info->installDate))) {
+            fty_proto_ext_insert(message, "description", "%s %s", self->info->hostname, self->info->installDate);
             change = 1;
         }
-        else if ((NULL != self->info->description) && (NULL != self->info->installDate)) {
-            fty_proto_ext_insert(message, "description", "%s\n%s", self->info->description, self->info->installDate);
+        else if ((NULL != self->info->description && 0 != strcmp("", self->info->description))
+                && (NULL != self->info->installDate && 0 != strcmp("", self->info->installDate))) {
+            fty_proto_ext_insert(message, "description", "%s %s", self->info->description, self->info->installDate);
             change = 1;
         }
-        else if (NULL != self->info->hostname) {
+        else if (NULL != self->info->hostname && 0 != strcmp("", self->info->hostname)) {
             fty_proto_ext_insert(message, "description", "%s", self->info->hostname);
             change = 1;
         }
-        else if (NULL != self->info->description) {
+        else if (NULL != self->info->description && 0 != strcmp("", self->info->description)) {
             fty_proto_ext_insert(message, "description", "%s", self->info->description);
             change = 1;
         }
-        else if (NULL != self->info->installDate) {
+        else if (NULL != self->info->installDate && 0 != strcmp("", self->info->installDate)) {
             fty_proto_ext_insert(message, "description", "%s", self->info->installDate);
             change = 1;
         }
