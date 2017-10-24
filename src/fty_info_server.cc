@@ -440,8 +440,11 @@ s_handle_mailbox(fty_info_server_t* self,zmsg_t *message)
     }
     //we assume all request command are MAILBOX DELIVER, and subject="info"
     if (!streq(command, "INFO") && !streq(command, "INFO-TEST")) {
+        char *zuuid = zmsg_popstr (message);
         zsys_warning ("fty-info: Received unexpected command '%s'", command);
         zmsg_t *reply = zmsg_new ();
+        if (NULL != zuuid)
+            zmsg_addstr(reply, zuuid);
         zmsg_addstr(reply, "ERROR");
         zmsg_addstr (reply, "unexpected command");
         mlm_client_sendto (self->client, mlm_client_sender (self->client), "info", NULL, 1000, &reply);
