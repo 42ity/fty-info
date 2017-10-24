@@ -36,8 +36,10 @@ using namespace std;
 #define FTY_INFO_AGENT  "fty-info"
 #define FTY_ASSET_AGENT "asset-agent"
 #define FTY_INFO_CMD    "INFO"
+#define DEFAULT_PATH    "/api/v1/admin/info"
 #define DEFAULT_ANNOUNCE_INTERVAL_SEC   60
 #define DEFAULT_LINUXMETRICS_INTERVAL_SEC   30
+#define STR_DEFAULT_LINUXMETRICS_INTERVAL_SEC   "30"
 
 // TODO: get from config
 #define TIMEOUT_MS              -1   //wait infinitely

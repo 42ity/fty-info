@@ -28,6 +28,8 @@
 
 #include "fty_info_classes.h"
 
+#define RC0_RUNONCE_ACTOR "fty-info-rc0-runonce"
+
 static int
 s_linuxmetrics_event (zloop_t *loop, int timer_id, void *output)
 {
@@ -48,11 +50,12 @@ usage(){
 int main (int argc, char *argv [])
 {
     int linuxmetrics_interval = DEFAULT_LINUXMETRICS_INTERVAL_SEC;
-    const char *str_linuxmetrics_interval = NULL;
+    char *str_linuxmetrics_interval = NULL;
     char *config_file = NULL;
     zconfig_t *config = NULL;
     char* actor_name = NULL;
     char* endpoint = NULL;
+    char* path = NULL;
     bool verbose = false;
     int argn;
 
@@ -99,8 +102,8 @@ int main (int argc, char *argv [])
             verbose = true;
         }
 
-	 // Linux metrics publishing interval (in seconds)
-        str_linuxmetrics_interval = s_get (config, "server/check_interval", "30");
+        // Linux metrics publishing interval (in seconds)
+        str_linuxmetrics_interval = strdup(s_get (config, "server/check_interval", "30"));
         if (str_linuxmetrics_interval) {
             linuxmetrics_interval = atoi (str_linuxmetrics_interval);
         }
@@ -108,11 +111,17 @@ int main (int argc, char *argv [])
         if (endpoint) zstr_free(&endpoint);
         endpoint = strdup(s_get (config, "malamute/endpoint", NULL));
         actor_name = strdup(s_get (config, "malamute/address", NULL));
+        path = strdup(s_get (config, "parameters/path", NULL));
     }
+    // Sanity checks
     if (actor_name == NULL)
         actor_name = strdup(FTY_INFO_AGENT);
     if (endpoint == NULL)
         endpoint = strdup("ipc://@/malamute");
+    if (path == NULL)
+        path = strdup(DEFAULT_PATH);
+    if (str_linuxmetrics_interval == NULL)
+        str_linuxmetrics_interval = strdup(STR_DEFAULT_LINUXMETRICS_INTERVAL_SEC);
 
     // Check env. variables
     if (getenv ("BIOS_LOG_LEVEL") && streq (getenv ("BIOS_LOG_LEVEL"), "LOG_DEBUG"))
@@ -126,6 +135,7 @@ int main (int argc, char *argv [])
         zsys_info ("fty_info - Agent which returns rack controller information");
     }
 
+    zstr_sendx (server, "PATH", path, NULL);
     zstr_sendx (server, "CONNECT", endpoint, actor_name, NULL);
     zstr_sendx (server, "CONSUMER", FTY_PROTO_STREAM_ASSETS, ".*", NULL);
     zstr_sendx (server, "PRODUCER", "ANNOUNCE", NULL);
@@ -134,7 +144,7 @@ int main (int argc, char *argv [])
     zstr_sendx (server, "PRODUCER", FTY_PROTO_STREAM_METRICS, NULL);
 
     // Run once actor to fill data about rackcontroller-0
-    zactor_t *rc0_runonce = zactor_new (fty_info_rc0_runonce, (void*) actor_name);
+    zactor_t *rc0_runonce = zactor_new (fty_info_rc0_runonce, (void *) RC0_RUNONCE_ACTOR);
     if (verbose) {
         zstr_sendx (rc0_runonce, "VERBOSE", NULL);
     }
@@ -151,6 +161,8 @@ int main (int argc, char *argv [])
     zactor_destroy (&rc0_runonce);
     zstr_free(&actor_name);
     zstr_free(&endpoint);
+    zstr_free(&path);
+    zstr_free(&str_linuxmetrics_interval);
     zconfig_destroy (&config);
 
     return 0;

@@ -129,7 +129,7 @@ s_get_release_details
 //  Create a new ftyinfo
 
 ftyinfo_t *
-ftyinfo_new (topologyresolver_t *resolver)
+ftyinfo_new (topologyresolver_t *resolver, const char *path)
 {
     ftyinfo_t *self = (ftyinfo_t *) zmalloc (sizeof (ftyinfo_t));
     self->infos = zhash_new();
@@ -200,7 +200,7 @@ ftyinfo_new (topologyresolver_t *resolver)
     zstr_free (&license);
 
     // use default
-    self->path = strdup (TXT_PATH);
+    self->path = strdup (path);
     self->protocol_format = strdup (TXT_PROTO_FORMAT);
     self->type = strdup (TXT_TYPE);
     self->txtvers   = strdup (TXT_VER);
@@ -231,6 +231,7 @@ ftyinfo_new (topologyresolver_t *resolver)
                 break;
             }
         }
+        freeifaddrs(interfaces);
     }
 
     if(si)
@@ -263,7 +264,7 @@ ftyinfo_test_new (void)
     self->description = strdup (TST_DESCRIPTION);
     self->contact = strdup (TST_CONTACT);
     self->installDate = strdup (TST_INSTALL_DATE);
-    self->path      = strdup (TXT_PATH);
+    self->path      = strdup (DEFAULT_PATH);
     self->protocol_format = strdup (TXT_PROTO_FORMAT);
     self->type      = strdup (TXT_TYPE);
     self->txtvers   = strdup (TXT_VER);
@@ -302,6 +303,8 @@ ftyinfo_destroy (ftyinfo_t **self_ptr)
         if (&self->protocol_format) zstr_free (&self->protocol_format);
         if (&self->type) zstr_free (&self->type);
         if (&self->txtvers) zstr_free (&self->txtvers);
+        for (size_t i = 0; i < sizeof(self->ip) / sizeof(self->ip[0]); ++i)
+                free(self->ip[i]);
         // Free object itself
         free (self);
         *self_ptr = NULL;

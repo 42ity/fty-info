@@ -1,21 +1,21 @@
 /*  =========================================================================
     fty_info_rc0_runonce - Run once actor to update rackcontroller-0 (SN, ...)
 
-    Copyright (C) 2014 - 2017 Eaton                                        
-                                                                           
-    This program is free software; you can redistribute it and/or modify   
-    it under the terms of the GNU General Public License as published by   
-    the Free Software Foundation; either version 2 of the License, or      
-    (at your option) any later version.                                    
-                                                                           
-    This program is distributed in the hope that it will be useful,        
-    but WITHOUT ANY WARRANTY; without even the implied warranty of         
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the          
-    GNU General Public License for more details.                           
-                                                                           
+    Copyright (C) 2014 - 2017 Eaton
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
     You should have received a copy of the GNU General Public License along
     with this program; if not, write to the Free Software Foundation, Inc.,
-    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.            
+    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
     =========================================================================
 */
 
@@ -53,7 +53,7 @@ fty_info_rc0_runonce_new (char *name)
     self->client = mlm_client_new ();
     self->verbose=false;
     self->resolver = topologyresolver_new (DEFAULT_RC_INAME);
-    self->info = ftyinfo_new (self->resolver);
+    self->info = ftyinfo_new (self->resolver, DEFAULT_PATH);
     return self;
 }
 
@@ -96,29 +96,33 @@ handle_stream(fty_info_rc0_runonce_t *self, zmsg_t *msg)
     fty_proto_t *message = fty_proto_decode (&msg);
     if (NULL == message ) {
         zsys_error ("can't decode message with subject %s, ignoring", mlm_client_subject (self->client));
-        zmsg_destroy (&msg);
         return -1;
     }
     if (fty_proto_id (message) != FTY_PROTO_ASSET) {
         zsys_debug("Not FTY_PROTO_ASSET");
         fty_proto_destroy (&message);
-        zmsg_destroy (&msg);
         return 0;
     }
 
     const char *operation = fty_proto_operation (message);
-    if (operation && !streq (operation, "device.rackcontroller")) {
-        zsys_debug("Not device.rackcontroller");
+    if (operation && !streq (operation, FTY_PROTO_ASSET_OP_UPDATE)) {
+        zsys_debug("Not FTY_PROTO_ASSET_OP_UPDATE");
         fty_proto_destroy (&message);
-        zmsg_destroy (&msg);
+        return 0;
+    }
+
+    const char *type = fty_proto_aux_string (message, "type", "");
+    const char *subtype = fty_proto_aux_string (message, "subtype", "");
+    if (!streq (type, "device") || !streq (subtype, "rackcontroller")) {
+        zsys_debug ("Not device.rackcontroller");
+        fty_proto_destroy (&message);
         return 0;
     }
 
     const char *iname = fty_proto_name(message);
-    if (NULL == iname || !(0 == streq(iname, DEFAULT_RC_INAME))) {
+    if (NULL == iname || !streq(iname, DEFAULT_RC_INAME)) {
         zsys_debug("Not %s", DEFAULT_RC_INAME);
         fty_proto_destroy (&message);
-        zmsg_destroy (&msg);
         return 0;
     }
 
@@ -222,23 +226,23 @@ handle_stream(fty_info_rc0_runonce_t *self, zmsg_t *msg)
                     break;
                 }
             }
+            freeifaddrs(interfaces);
         }
     }
 
     if (0 != change) {
         fty_proto_t *messageDup = fty_proto_dup(message);
         zmsg_t *msgDup = fty_proto_encode(&messageDup);
+        zmsg_pushstrf (msgDup, "%s", "READWRITE");
         int rv = mlm_client_sendto(self->client, "asset-agent", "ASSET_MANIPULATION", NULL, 10, &msgDup);
         if (rv == -1) {
             zsys_error("Failed to send ASSET_MANIPULATION message to asset-agent");
             fty_proto_destroy (&message);
-            zmsg_destroy (&msg);
             return -1;
         }
     }
 
     fty_proto_destroy (&message);
-    zmsg_destroy (&msg);
     return 1;
 }
 
@@ -267,14 +271,14 @@ handle_pipe(fty_info_rc0_runonce_t *self, zmsg_t *message)
     else
     if (streq(command, "CONNECT")) {
         char *endpoint = zmsg_popstr (message);
-    
+
         if (endpoint) {
             self->endpoint = strdup(endpoint);
             zsys_debug ("fty-info-rc0-runonce: CONNECT: %s/%s", self->endpoint, self->name);
             int rv = mlm_client_connect (self->client, self->endpoint, 1000, self->name);
             if (rv == -1)
                 zsys_error("mlm_client_connect failed\n");
-    
+
         }
         zstr_free (&endpoint);
     }
@@ -296,7 +300,7 @@ handle_pipe(fty_info_rc0_runonce_t *self, zmsg_t *message)
     }
     else
         zsys_error ("fty-info-rc0-runonce: Unknown actor command: %s.\n", command);
-    
+
     zstr_free (&command);
     zmsg_destroy (&message);
     return 0;

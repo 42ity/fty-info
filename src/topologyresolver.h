@@ -35,6 +35,10 @@ FTY_INFO_PRIVATE topologyresolver_t *
 FTY_INFO_PRIVATE void
     topologyresolver_destroy (topologyresolver_t **self_p);
 
+//  Set endpoint for Malamute client
+FTY_INFO_PRIVATE void
+    topologyresolver_set_endpoint (topologyresolver_t *self, const char *endpoint);
+
 //  get RC internal name
 FTY_INFO_PRIVATE char *
     topologyresolver_id (topologyresolver_t *self);
