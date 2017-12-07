@@ -31,6 +31,7 @@
 #include <set>
 
 // State
+#define DEFAULT_ENDPOINT "ipc://@/malamute"
 
 typedef enum {
     DISCOVERING = 0,
@@ -42,8 +43,10 @@ typedef enum {
 struct _topologyresolver_t {
     char *iname;
     char *topology;
+    const char * endpoint;
     ResolverState state;
     zhashx_t *assets;
+    mlm_client_t *client;
 };
 
 static std::map<std::string,std::set<std::string>>
@@ -184,6 +187,7 @@ topologyresolver_new (const char *iname)
     self->assets = zhashx_new ();
     zhashx_set_destructor (self->assets, (czmq_destructor *) fty_proto_destroy);
     zhashx_set_duplicator (self->assets, (czmq_duplicator *) fty_proto_dup);
+    self->client = mlm_client_new ();
     return self;
 }
 
@@ -201,6 +205,7 @@ topologyresolver_destroy (topologyresolver_t **self_p)
         zhashx_destroy (&self->assets);
         zstr_free (&self->iname);
         zstr_free (&self->topology);
+        mlm_client_destroy (&self->client);
         //  Free object itself
         free (self);
         *self_p = NULL;
@@ -208,41 +213,71 @@ topologyresolver_destroy (topologyresolver_t **self_p)
 }
 
 //  --------------------------------------------------------------------------
+//  set endpoint of topologyresolver
+void
+topologyresolver_set_endpoint (topologyresolver_t *self, const char *endpoint)
+{
+    self->endpoint = endpoint;
+    mlm_client_connect (self->client, endpoint, 1000, "fty_info_topologyresolver");
+}
+
+//  --------------------------------------------------------------------------
 //  get RC internal name
 
-const char *
+char *
 topologyresolver_id (topologyresolver_t *self)
 {
-    if (! self || ! self->iname) return "NA";
-    return  self->iname;
+    if (! self || ! self->iname) return NULL;
+    return strdup(self->iname);
 }
 
 //  --------------------------------------------------------------------------
 //  Give topology resolver one asset information
-void
+bool
 topologyresolver_asset (topologyresolver_t *self, fty_proto_t *message)
 {
-    if (! self || ! message) return;
-    if (fty_proto_id (message) != FTY_PROTO_ASSET) return;
+    if (! self || ! message) return false;
+    if (fty_proto_id (message) != FTY_PROTO_ASSET) return false;
     const char *operation = fty_proto_operation (message);
-    if (operation && streq (operation, "inventory")) return;
+    //discard inventory due to the lack of some field.
+    if (operation && streq (operation, "inventory")) return false;
 
+    const char *iname = fty_proto_name (message);
+    // is this message about me?
     if (!self->iname && s_is_this_me (message)) {
         self->iname = strdup (fty_proto_name (message));
+        // previous code wasn't doing republish at this point
+        return false;
     }
-    const char *iname = fty_proto_name (message);
+    if (self->iname && streq (self->iname, iname)) {
+        // we received a message about ourselves, trigger recomputation
+        zhashx_update (self->assets, iname, message);
+        zlistx_t *list = topologyresolver_to_list (self);
+        if (! zlistx_size (list)) {
+            // Can't resolve topology any more
+            self->state = DISCOVERING;
+            zlistx_destroy (&list);
+            return false;
+        }
+        zlistx_destroy (&list);
+        return true;
+    }
 
+    // is this message about my parent?
     if (self->state == DISCOVERING) {
-        // discovering
+        // discovering - every asset (except me) is a possible parent
         zhashx_update (self->assets, iname, message);
         zlistx_t *list = topologyresolver_to_list (self);
         if (zlistx_size (list)) {
             self->state = UPTODATE;
             s_purge_message_cache (self);
+            zlistx_destroy (&list);
+            return true;
         }
         zlistx_destroy (&list);
+        return false;
     } else {
-        // up to date
+        // up to date - check assets in cache
         fty_proto_t *iname_msg = (fty_proto_t *) zhashx_lookup (self->assets, iname);
         if (iname_msg) {
             // we received a message about asset in our topology, trigger recomputation
@@ -251,10 +286,15 @@ topologyresolver_asset (topologyresolver_t *self, fty_proto_t *message)
             if (! zlistx_size (list)) {
                 // Can't resolv topology any more
                 self->state = DISCOVERING;
+                zlistx_destroy (&list);
+                return false;
             }
             zlistx_destroy (&list);
+            return true;
         }
     }
+
+    return false;
 }
 
 //  --------------------------------------------------------------------------
@@ -265,7 +305,7 @@ char *
     if (self && self->iname)
         return zsys_sprintf ("/asset/%s", self->iname);
     else
-        return strdup ("NA");
+        return NULL;
 }
 
 //  --------------------------------------------------------------------------
@@ -276,18 +316,13 @@ topologyresolver_to_parent_uri (topologyresolver_t *self)
     if (self && self->iname) {
         fty_proto_t *rc_message = (fty_proto_t *) zhashx_lookup (self->assets, self->iname);
         if (rc_message) {
-            const char *parent_iname = fty_proto_aux_string (rc_message, "parent", "NA");
-            if (!streq (parent_iname, "NA")) {
+            const char *parent_iname = fty_proto_aux_string (rc_message, "parent_name.1", NULL);
+            if (parent_iname) {
                 return zsys_sprintf ("/asset/%s", parent_iname);
             }
-            else
-                return strdup ("NA");
         }
-        else
-            return strdup ("NA");
     }
-    else
-        return strdup ("NA");
+    return NULL;
 }
 
 
@@ -298,13 +333,14 @@ topologyresolver_to_rc_name (topologyresolver_t *self)
 {
     if (self && self->iname) {
         fty_proto_t *rc_message = (fty_proto_t *) zhashx_lookup (self->assets, self->iname);
-        if (rc_message)
-            return strdup (fty_proto_ext_string (rc_message, "name", "NA"));
-        else
-            return strdup ("NA");
+        if (rc_message) {
+            const char *name = fty_proto_ext_string (rc_message, "name", NULL);
+            if (name) {
+                return strdup(name);
+            }
+        }
     }
-    else
-        return strdup ("NA");
+    return NULL;
 }
 
 //  --------------------------------------------------------------------------
@@ -314,13 +350,14 @@ topologyresolver_to_description (topologyresolver_t *self)
 {
     if (self && self->iname) {
         fty_proto_t *rc_message = (fty_proto_t *) zhashx_lookup (self->assets, self->iname);
-        if (rc_message)
-            return strdup (fty_proto_ext_string (rc_message, "description", "NA"));
-        else
-            return strdup ("NA");
+        if (rc_message) {
+            const char *description = fty_proto_ext_string (rc_message, "description", NULL);
+            if (description) {
+                return strdup(description);
+            }
+        }
     }
-    else
-        return strdup ("NA");
+    return NULL;
 }
 
 //  --------------------------------------------------------------------------
@@ -330,25 +367,26 @@ topologyresolver_to_contact (topologyresolver_t *self)
 {
     if (self && self->iname) {
         fty_proto_t *rc_message = (fty_proto_t *) zhashx_lookup (self->assets, self->iname);
-        if (rc_message)
-            return strdup (fty_proto_ext_string (rc_message, "contact_email", "NA"));
-        else
-            return strdup ("NA");
+        if (rc_message) {
+            const char *contact_email = fty_proto_ext_string (rc_message, "contact_email", NULL);
+            if (contact_email) {
+                strdup(contact_email);
+            }
+        }
     }
-    else
-        return strdup ("NA");
+    return NULL;
 }
 
 //  --------------------------------------------------------------------------
 //  Return topology as string of friendly names (or NULL if incomplete)
-const char *
+char *
 topologyresolver_to_string (topologyresolver_t *self, const char *separator)
 {
     zlistx_t *parents = topologyresolver_to_list (self);
 
     if (! zlistx_size (parents)) {
         zlistx_destroy (&parents);
-        return "NA";
+        return NULL;
     }
 
     zstr_free (&self->topology);
@@ -372,7 +410,7 @@ topologyresolver_to_string (topologyresolver_t *self, const char *separator)
         *p = 0;
     }
     zlistx_destroy (&parents);
-    return self->topology;
+    return strdup(self->topology);
 }
 
 
@@ -399,9 +437,39 @@ topologyresolver_to_list (topologyresolver_t *self)
         const char *parent = fty_proto_aux_string (msg, buffer, NULL);
         if (! parent) break;
         if (! zhashx_lookup (self->assets, parent)) {
-            // parent is unknown, topology is not complete
-            zlistx_purge (list);
-            break;
+            // ask ASSET_AGENT for ASSET_DETAIL
+            if (mlm_client_connected (self->client)) {
+                zuuid_t *uuid = zuuid_new ();
+                zsys_debug ("ask ASSET AGENT for ASSET_DETAIL, RC = %s, iname = %s", self->iname, parent);
+                mlm_client_sendtox (self->client, FTY_ASSET_AGENT, "ASSET_DETAIL",
+                        "GET", zuuid_str_canonical (uuid), parent, NULL);
+                zmsg_t *parent_msg = mlm_client_recv (self->client);
+                if (parent_msg) {
+                    char *rcv_uuid = zmsg_popstr (parent_msg);
+                    if (0 == strcmp (rcv_uuid, zuuid_str_canonical (uuid)) && fty_proto_is (parent_msg)) {
+                        fty_proto_t *parent_fmsg = fty_proto_decode (&parent_msg);
+                        zhashx_update (self->assets, parent, parent_fmsg);
+                        zlistx_add_start (list, (void *)parent);
+                    }
+                    else {
+                        // invalid zuuid or unknown parent, topology is not complete
+                        zlistx_purge (list);
+                        break;
+                    }
+                    zstr_free(&rcv_uuid);
+                }
+                else {
+                    // parent is unknown, topology is not complete
+                    zlistx_purge (list);
+                    break;
+                }
+                zuuid_destroy (&uuid);
+            }
+            else {
+                // parent is unknown, topology is not complete
+                zlistx_purge (list);
+                break;
+            }
         } else {
             zlistx_add_start (list, (void *)parent);
         }
@@ -457,9 +525,9 @@ topologyresolver_test (bool verbose)
     zhash_update (aux, "parent_name.1", (void *)"grandparent");
     fty_proto_set_aux (msg3, &aux);
 
-    const char *res = topologyresolver_to_string (resolver);
+    char *res = topologyresolver_to_string (resolver);
     topologyresolver_asset (resolver, msg1);
-    assert (streq (res, "NA"));
+    assert (NULL == res);
 
     topologyresolver_asset (resolver, msg);
     assert (zhashx_size (resolver->assets) == 2);
@@ -467,16 +535,17 @@ topologyresolver_test (bool verbose)
     topologyresolver_asset (resolver, msg2);
     assert (zhashx_size (resolver->assets) == 3);
     res = topologyresolver_to_string (resolver);
-    assert (streq (res, "NA"));
+    assert (NULL == res);
 
     topologyresolver_asset (resolver, msg3);
     assert (zhashx_size (resolver->assets) == 3);
     res = topologyresolver_to_string (resolver, "->");
     assert (streq ("my nice grandparent->this is father", res));
+    free(res);
 
     fty_proto_t *msg4 = fty_proto_new (FTY_PROTO_ASSET);
     fty_proto_set_name (msg4, "me");
-    fty_proto_set_operation (msg2, FTY_PROTO_ASSET_OP_UPDATE);
+    fty_proto_set_operation (msg4, FTY_PROTO_ASSET_OP_UPDATE);
     ext = zhash_new ();
     zhash_autofree (ext);
     zhash_update (ext, "name", (void *)"this is me");
@@ -489,7 +558,7 @@ topologyresolver_test (bool verbose)
 
     topologyresolver_asset (resolver, msg4);
     res = topologyresolver_to_string (resolver);
-    assert (streq (res, "NA"));
+    assert (NULL == res);
 
     fty_proto_t *msg5 = fty_proto_new (FTY_PROTO_ASSET);
 
@@ -507,7 +576,7 @@ topologyresolver_test (bool verbose)
     topologyresolver_asset (resolver, msg5);
     res = topologyresolver_to_string (resolver, "->");
     assert (streq ("my nice grandparent->this is new father", res));
-
+    free(res);
 
     fty_proto_destroy (&msg5);
     fty_proto_destroy (&msg4);

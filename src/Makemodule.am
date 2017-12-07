@@ -25,6 +25,7 @@ endif
 src_libfty_info_la_SOURCES = \
     src/topologyresolver.cc \
     src/ftyinfo.cc \
+    src/fty_info_rc0_runonce.cc \
     src/platform.h
 
 if ENABLE_DRAFTS

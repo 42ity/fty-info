@@ -35,8 +35,12 @@ FTY_INFO_PRIVATE topologyresolver_t *
 FTY_INFO_PRIVATE void
     topologyresolver_destroy (topologyresolver_t **self_p);
 
+//  Set endpoint for Malamute client
+FTY_INFO_PRIVATE void
+    topologyresolver_set_endpoint (topologyresolver_t *self, const char *endpoint);
+
 //  get RC internal name
-FTY_INFO_PRIVATE const char *
+FTY_INFO_PRIVATE char *
     topologyresolver_id (topologyresolver_t *self);
 
 // Return URI of asset for this topologyresolver
@@ -44,7 +48,7 @@ FTY_INFO_PRIVATE char *
     topologyresolver_to_rc_name_uri (topologyresolver_t *self);
 
 //  Give topology resolver one asset information
-FTY_INFO_PRIVATE void
+FTY_INFO_PRIVATE bool
     topologyresolver_asset (topologyresolver_t *self, fty_proto_t *message);
 
 //  Return URI of the asset's parent
@@ -64,7 +68,7 @@ FTY_INFO_PRIVATE char *
     topologyresolver_to_contact (topologyresolver_t *self);
 
 //  Return topology as string of friedly names (or NULL if incomplete)
-FTY_INFO_PRIVATE const char *
+FTY_INFO_PRIVATE char *
     topologyresolver_to_string (topologyresolver_t *self, const char *separator = "/");
 
 //  Return zlist of inames starting with asset up to DC

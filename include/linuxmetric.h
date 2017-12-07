@@ -63,11 +63,11 @@ FTY_INFO_EXPORT zlistx_t *
     linuxmetric_get_all
     (int interval,
      zhashx_t *history,
-     std::string root_dir,
+     std::string &root_dir,
      bool metrics_test);
 
 FTY_INFO_EXPORT zhashx_t *
-    linuxmetric_list_interfaces (std::string root_dir);
+    linuxmetric_list_interfaces (std::string &root_dir);
 //  @end
 
 #ifdef __cplusplus

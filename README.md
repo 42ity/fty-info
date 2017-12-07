@@ -1,5 +1,6 @@
 # fty-info
-Agent which returns information
+
+fty-info is an agent distributing information about RC on which IPM Infra software is running.
 
 ## How to build
 
@@ -12,55 +13,137 @@ make
 make check # to run self-test
 ```
 
+## How to run
+
+To run fty-info project:
+
+* from within the source tree, run:
+
+```bash
+./src/fty-info
+```
+
+For the other options available, refer to the manual page of fty-info.
+
+* from an installed base, using systemd, run:
+
+```bash
+systemctl start fty-info
+```
+
+### Configuration file
+
+Agent has a configuration file: fty-info.cfg.
+Except standard server and malamute options, there are two other options:
+* server/check_interval for how often to publish Linux system metrics
+* parameters/path for REST API root used by IPM Infra software
+Agent reads environment variable BIOS_LOG_LEVEL, which sets verbosity level of the agent.
+
+## Architecture
+
+### Overview
+
+fty-info is composed of 2 actors:
+
+* info-server: processes raw data to get RC information and distributes it further
+* info-rc0-runonce: on start, puts the gathered RC data into DB
+
+In addition to actors, there is one timer:
+
+* linuxmetrics timer: runs every linuxmetrics_interval (by default every 30 seconds) and triggers publication of Linux system metrics
+
 ## Protocols
 
-Connects USER peer to fty-info peer.
+### Published metrics
 
-The USER peer sends the following message using MAILBOX, with subject "info" to 
-fty-info peer:
-* INFO - request info about the system
-* zuuid - user request uuid
+Agent publishes Linux system metrics on FTY_PROTO_STREAM_METRICS, for example:
 
-The fty-info peer MUST respond with this message back to USER 
-peer using MAILBOX SEND:
-* zuuid - original user request uuid
-* hash  - hash table decribed bellow
-
-For testing purpose, The USER peer sends the following message 
-using MAILBOX SEND, with subject "info" to fty-info peer: 
-* INFO-TEST - request fake info about the system
-* zuuid - user request uuid
-
-the hash table contains a list of key/value pair.
-keys are defined in include/fty_info.h :
-* INFO_UUID = "uuid"
-* INFO_HOSTNAME = "hostname"
-* INFO_NAME = "name"
-* INFO_VENDOR = "vendor"
-* INFO_MODEL = "model"
-* INFO_SERIAL = "serial"
-* INFO_LOCATION = "location"
-* INFO_VERSION = "version"
-* INFO_REST_PATH = "rest_path"
-* INFO_REST_PORT = "rest_port"
-
-## How to request fty-info ?
-```
-    #include "fty_info.h"
-
-    zmsg_t *command = zmsg_new ();
-    zmsg_addstr (command, "INFO");
-    zmsg_addstrf (command, "%s", zuuid);
-    mlm_client_sendto (client, "fty-info", "info", NULL, 1000, &command);
+```bash
+stream=METRICS
+sender=fty_info_linuxmetrics
+subject=usage.memory@rackcontroller-0
+D: 17-10-17 06:34:24 FTY_PROTO_METRIC:
+D: 17-10-17 06:34:24     aux=
+D: 17-10-17 06:34:24     time=1508222064
+D: 17-10-17 06:34:24     ttl=90
+D: 17-10-17 06:34:24     type='usage.memory'
+D: 17-10-17 06:34:24     name='rackcontroller-0'
+D: 17-10-17 06:34:24     value='40.000000'
+D: 17-10-17 06:34:24     unit='%'
 ```
 
-## How to decode reply from fty-info ?
-```
-    msg_t *recv = mlm_client_recv (client);
-    char *zuuid_reply = zmsg_popstr (recv);
-    zframe_t *frame_infos = zmsg_next (recv);
-    zhash_t *infos = zhash_unpack(frame_infos); 
-    char * product_name = (char *) zhash_lookup (infos, "vendor" );
-    zhash_destroy(&infos);
-```
+### Published alerts
 
+Agent doesn't publish any alerts.
+
+### Mailbox requests
+
+It is possible to request the fty-info agent for:
+
+* RC information
+
+#### RC information
+
+The USER peer (supposed to be REST API) sends the following messages using MAILBOX SEND to
+FTY-INFO-AGENT ("fty-info") peer:
+
+* INFO/'msg-correlation-id'
+
+where:
+
+* 'msg-correlation-id' MUST be zuuid identifier provided by USER
+* subject of the message MUST be discarded
+
+The FTY-INFO-AGENT peer MUST respond with one of the messages back to USER
+peer using MAILBOX SEND.
+
+* 'msg-correlation-id'/INFO/'srv-name'/'srv-type'/'srv-subtype'/'srv-port'/'info-hash'
+
+where
+* '/' indicates a multipart frame message
+* subject of the message MUST be discarded
+* 'msg-correlation-id' MUST be the same as in request
+* 'srv-name' MUST be IPC ('short-uuid'), where 'short-uuid' is first 16 bytes of RC UUID
+* 'srv-type' MUST be service type recognized by mDNS (for example \_https.\_tcp.)
+* 'srv-subtype' MUST be service subtype recognized by mDNS (for example \_powerservice.\_sub.\_https.\_tcp.)
+* 'srv-port' MUST be network port on which the service is available (for example 443)
+* 'info-hash' MUST be zframe containing hash with the following keys:
+    * "id"
+    * "uuid"
+    * "hostname"
+    * "name"
+    * "name-uri"
+    * "vendor"
+    * "manufacturer"
+    * "product"
+    * "serialNumber"
+    * "partNumber"
+    * "location"
+    * "parent-uri"
+    * "version"
+    * "description"
+    * "contact"
+    * "installDate"
+    * "path"
+    * "protocol-format"
+    * "type"
+    * "txtvers"
+    * "ip.1"
+    * "ip.2"
+    * "ip.3"
+
+    Value associated with ANY key MAY be NULL.
+
+### Stream subscriptions
+
+* Actor info-server is subscribed to ASSETS stream. On receiving such a message, it MUST:
+    * update cache with location topology information
+    * republish INFO message on ASSET stream IF the ASSET message was CREATE or UPDATE of this RC
+
+    Detection is based on equality of IP address.
+
+* Actor info-rc0-runonce is subscribed to ASSETS stream, but only for rackcontroller-0 UPDATE messages. On receiving first such a message, it MUST:
+    * use all the information provided in the message to update stored RC info
+    * re-send the received ASSET message as ASSET_MANIPULATION message to FTY-ASSET-AGENT (asset-agent)
+
+    On receiving next such a message, or any other message, it MUST do nothing.

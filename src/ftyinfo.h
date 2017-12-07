@@ -31,8 +31,8 @@ extern "C" {
 #define SRV_NAME "IPC"
 #define SRV_TYPE "_https._tcp."
 #define SRV_STYPE "_powerservice._sub._https._tcp."
-#define SRV_PORT "443"
-#define TXT_PATH "/api/v1/comm/connections"
+#define SRV_PORT  "443"
+#define TXT_PATH  "/api/v1/comm"
 #define TXT_PROTO_FORMAT "etnrs"
 #define TXT_TYPE   "ipc"
 #define TXT_VER  "1"
@@ -42,9 +42,9 @@ extern "C" {
 #define TST_UUID        "ce7c523e-08bf-11e7-af17-080027d52c4f"
 #define TST_HOSTNAME    "localhost"
 #define TST_NAME        "MyIPC"
-#define TST_INAME       "ipc-001"
-#define TST_NAME_URI    "/asset/ipc-001"
-#define TST_MODEL       "IPC3000"
+#define TST_INAME       "rackcontroller-0"
+#define TST_NAME_URI    "/asset/rackcontroller-0"
+#define TST_PRODUCT     "IPC3000"
 #define TST_VENDOR      "Eaton"
 #define TST_SERIAL      "LA71026006"
 #define TST_PART_NUMBER      "123456"
@@ -66,10 +66,37 @@ extern "C" {
 #define HIST_CPU_DENOMINATOR	"cpu_usage_denominator"
 #define NETWORK_HISTORY_PREFIX	"network_history"
 
+//  Structure of our class
+
+struct _ftyinfo_t {
+    zhash_t *infos;
+    char *id;
+    char *uuid;
+    char *hostname;
+    char *name;
+    char *name_uri;
+    char *product;
+    char *vendor;
+    char *manufacturer;
+    char *serial;
+    char *part_number;
+    char *location;
+    char *parent_uri;
+    char *version;
+    char *description;
+    char *contact;
+    char *installDate;
+    char *path;
+    char *protocol_format;
+    char *type;
+    char *txtvers;
+    char *ip[3];
+};
+
 //  @interface
 //  Create a new ftyinfo
 FTY_INFO_PRIVATE ftyinfo_t *
-    ftyinfo_new (topologyresolver_t *resolver);
+    ftyinfo_new (topologyresolver_t *resolver, const char * path);
 
 FTY_INFO_PRIVATE ftyinfo_t *
     ftyinfo_test_new (void);

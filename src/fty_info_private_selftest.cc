@@ -39,6 +39,7 @@ fty_info_private_selftest (bool verbose)
 {
 // Tests for stable private classes:
     topologyresolver_test (verbose);
+    fty_info_rc0_runonce_test (verbose);
 }
 /*
 ################################################################################

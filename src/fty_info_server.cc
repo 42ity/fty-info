@@ -25,8 +25,6 @@
 @discuss
 @end
 */
-#define TIMEOUT_MS -1   //wait infinitelly
-
 #include <string>
 #include <unistd.h>
 #include <bits/local_lim.h>
@@ -43,30 +41,20 @@ struct _fty_info_server_t {
     //  Declare class properties here
     char* name;
     char* endpoint;
+    char* path;
     mlm_client_t *client;
     mlm_client_t *announce_client;
     mlm_client_t *info_client;
     bool verbose;
     bool first_announce;
-    bool announce_test;
-    bool metrics_test;
+    bool test;
     topologyresolver_t* resolver;
     int linuxmetrics_interval;
     std::string root_dir; //directory to be considered / - used for testing
     zhashx_t *history;
 };
 
-// Configuration accessors
-// FIXME: why do we need that? zconfig_get should already do this, no?
-const char*
-s_get (zconfig_t *config, const char* key, std::string &dfl) {
-    assert (config);
-    char *ret = zconfig_get (config, key, dfl.c_str());
-    if (!ret || streq (ret, ""))
-        return (char*)dfl.c_str();
-    return ret;
-}
-
+// this is kept for to handle with values set to ""
 const char*
 s_get (zconfig_t *config, const char* key, const char*dfl) {
     assert (config);
@@ -99,9 +87,9 @@ info_server_new (char *name)
     self->info_client = mlm_client_new ();
     self->verbose=false;
     self->first_announce=true;
-    self->announce_test=false;
-    self->metrics_test=false;
+    self->test = false;
     self->history = zhashx_new();
+    self->resolver = topologyresolver_new (DEFAULT_RC_INAME);
     zhashx_set_destructor(self->history, history_destructor);
     zhashx_insert(self->history, HIST_CPU_NUMERATOR, numerator_ptr);
     zhashx_insert(self->history, HIST_CPU_DENOMINATOR, denominator_ptr);
@@ -122,6 +110,7 @@ info_server_destroy (fty_info_server_t  **self_p)
         mlm_client_destroy (&self->info_client);
         zstr_free(&self->name);
         zstr_free(&self->endpoint);
+        zstr_free(&self->path);
         topologyresolver_destroy (&self->resolver);
         zhashx_destroy(&self->history);
         //  Free object itself
@@ -139,7 +128,11 @@ char *s_get_name(const char *name, const char *uuid)
 
     char *buffer = (char*)malloc(strlen(name)+12);
     char first_digit[9];
-    strncpy ( first_digit, uuid, 8 );
+    if (uuid) {
+        strncpy ( first_digit, uuid, 8 );
+    } else {
+        strncpy ( first_digit, DEFAULT_UUID, 8 );
+    }
     first_digit[8]='\0';
     sprintf(buffer, "%s (%s)",name,first_digit);
     return buffer;
@@ -159,7 +152,7 @@ char *s_get_name(const char *name, const char *uuid)
 //          name_uri
 //          vendor
 //          serial
-//          model
+//          product
 //          location
 //          parent_uri
 //          version
@@ -174,7 +167,11 @@ s_create_info (ftyinfo_t *info)
     zmsg_t *msg=zmsg_new();
     zmsg_addstr (msg, FTY_INFO_CMD);
     char *srv_name = s_get_name(SRV_NAME, ftyinfo_uuid(info));
-    zmsg_addstr (msg, srv_name);
+    if (srv_name) {
+        zmsg_addstr (msg, srv_name);
+    } else {
+        zmsg_addstr (msg, DEFAULT_UUID);
+    }
     zmsg_addstr (msg, SRV_TYPE);
     zmsg_addstr (msg, SRV_STYPE);
     zmsg_addstr (msg, SRV_PORT);
@@ -198,8 +195,8 @@ s_publish_announce(fty_info_server_t  * self)
     if(!mlm_client_connected(self->announce_client))
         return;
     ftyinfo_t *info;
-    if (!self->announce_test) {
-        info = ftyinfo_new (self->resolver);
+    if (!self->test) {
+        info = ftyinfo_new (self->resolver,self->path);
     }
     else
         info = ftyinfo_test_new ();
@@ -234,10 +231,10 @@ s_publish_linuxmetrics (fty_info_server_t  * self)
         (self->linuxmetrics_interval,
          self->history,
          self->root_dir,
-         self->metrics_test);
+         self->test);
 
     int ttl = 3 * self->linuxmetrics_interval; // in seconds
-    const char *rc_iname = topologyresolver_id (self->resolver);
+    char *rc_iname = topologyresolver_id (self->resolver);
 
     linuxmetric_t *metric = (linuxmetric_t *) zlistx_first (info);
     while (metric) {
@@ -265,6 +262,7 @@ s_publish_linuxmetrics (fty_info_server_t  * self)
         zstr_free (&value);
     }
 
+    free(rc_iname);
     zlistx_destroy (&info);
 
 }
@@ -294,6 +292,8 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
         char *endpoint = zmsg_popstr (message);
 
         if (endpoint) {
+            if (!self->test)
+                topologyresolver_set_endpoint (self->resolver, endpoint);
             self->endpoint = strdup(endpoint);
             zsys_debug ("fty-info: CONNECT: %s/%s", self->endpoint, self->name);
             int rv = mlm_client_connect (self->client, self->endpoint, 1000, self->name);
@@ -307,6 +307,16 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
     if (streq (command, "VERBOSE")) {
         self->verbose = true;
         zsys_debug ("fty-info: VERBOSE=true");
+    }
+    else
+    if (streq (command, "PATH")) {
+        char *path = zmsg_popstr (message);
+
+        if (path) {
+            self->path = strdup(path);
+            zsys_debug ("fty-info: PATH: %s", self->path);
+        }
+        zstr_free (&path);
     }
     else
     if (streq (command, "CONSUMER")) {
@@ -323,8 +333,8 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
     if (streq (command, "PRODUCER")) {
         char* stream = zmsg_popstr (message);
         if (streq (stream, "ANNOUNCE-TEST") || streq (stream, "ANNOUNCE")) {
-            self->announce_test = streq(stream,"ANNOUNCE-TEST");
-            if (!self->announce_test) {
+            self->test = streq(stream,"ANNOUNCE-TEST");
+            if (!self->test) {
                 zmsg_t *republish = zmsg_new ();
                 int rv = mlm_client_sendto (self->client, FTY_ASSET_AGENT, "REPUBLISH", NULL, 5000, &republish);
                 if ( rv != 0) {
@@ -344,7 +354,7 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
                 s_publish_announce(self);
         }
         else if (streq (stream, "METRICS-TEST") || streq (stream, FTY_PROTO_STREAM_METRICS)) {
-            self->metrics_test = streq(stream,"METRICS-TEST");
+            self->test = streq(stream,"METRICS-TEST");
             int rv = mlm_client_connect (self->info_client, self->endpoint, 1000, "fty_info_linuxmetrics");
             if (rv == -1)
                     zsys_error("fty_info_linuxmetrics : mlm_client_connect failed\n");
@@ -375,6 +385,9 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
         zsys_info ("Will be using %s as root dir for finding out Linux metrics", root_dir);
         self->root_dir.assign (root_dir);
         zstr_free (&root_dir);
+    }
+    else if (streq (command, "TEST")) {
+        self->test = true;
     }
     else if (streq (command, "ANNOUNCE")) {
         s_publish_announce (self);
@@ -420,7 +433,9 @@ s_handle_stream (fty_info_server_t* self, zmsg_t *message)
         return;
 
     }
-    topologyresolver_asset (self->resolver, bmessage);
+    if(topologyresolver_asset (self->resolver, bmessage)) {
+        s_publish_announce(self);
+    }
 
     fty_proto_destroy (&bmessage);
     zmsg_destroy (&message);
@@ -440,8 +455,11 @@ s_handle_mailbox(fty_info_server_t* self,zmsg_t *message)
     }
     //we assume all request command are MAILBOX DELIVER, and subject="info"
     if (!streq(command, "INFO") && !streq(command, "INFO-TEST")) {
+        char *zuuid = zmsg_popstr (message);
         zsys_warning ("fty-info: Received unexpected command '%s'", command);
         zmsg_t *reply = zmsg_new ();
+        if (NULL != zuuid)
+            zmsg_addstr(reply, zuuid);
         zmsg_addstr(reply, "ERROR");
         zmsg_addstr (reply, "unexpected command");
         mlm_client_sendto (self->client, mlm_client_sender (self->client), "info", NULL, 1000, &reply);
@@ -454,7 +472,7 @@ s_handle_mailbox(fty_info_server_t* self,zmsg_t *message)
         char *zuuid = zmsg_popstr (message);
         ftyinfo_t *info;
         if (streq(command, "INFO")) {
-            info = ftyinfo_new (self->resolver);
+            info = ftyinfo_new (self->resolver,self->path);
         }
         if (streq(command, "INFO-TEST")) {
             info = ftyinfo_test_new ();
@@ -483,7 +501,6 @@ fty_info_server (zsock_t *pipe, void *args)
     }
 
     fty_info_server_t *self = info_server_new (name);
-    self->resolver = topologyresolver_new (NULL);
     zpoller_t *poller = zpoller_new (pipe, mlm_client_msgpipe (self->client), NULL);
     assert (poller);
 
@@ -550,6 +567,8 @@ fty_info_server_test (bool verbose)
     zactor_t *info_server = zactor_new (fty_info_server, (void*) "fty-info");
     if (verbose)
         zstr_send (info_server, "VERBOSE");
+    zstr_sendx (info_server, "TEST", NULL);
+    zstr_sendx (info_server, "PATH", DEFAULT_PATH, NULL);
     zstr_sendx (info_server, "CONNECT", endpoint, NULL);
     zstr_sendx (info_server, "CONSUMER", FTY_PROTO_STREAM_ASSETS, ".*", NULL);
 	zclock_sleep (1000);
@@ -606,9 +625,9 @@ fty_info_server_test (bool verbose)
         char * serial = (char *) zhash_lookup (infos, INFO_SERIAL);
         assert(serial && streq (serial, TST_SERIAL));
         zsys_debug ("fty-info-test: serial = '%s'", serial);
-        char * model = (char *) zhash_lookup (infos, INFO_MODEL);
-        assert(model && streq (model, TST_MODEL));
-        zsys_debug ("fty-info-test: model = '%s'", model);
+        char * product = (char *) zhash_lookup (infos, INFO_PRODUCT);
+        assert(product && streq (product, TST_PRODUCT));
+        zsys_debug ("fty-info-test: product = '%s'", product);
         char * location = (char *) zhash_lookup (infos, INFO_LOCATION);
         assert(location && streq (location, TST_LOCATION));
         zsys_debug ("fty-info-test: location = '%s'", location);
@@ -619,7 +638,7 @@ fty_info_server_test (bool verbose)
         assert(version && streq (version, TST_VERSION));
         zsys_debug ("fty-info-test: version = '%s'", version);
         char * rest_root = (char *) zhash_lookup (infos, INFO_REST_PATH);
-        assert(rest_root && streq (rest_root, TXT_PATH));
+        assert(rest_root && streq (rest_root, DEFAULT_PATH));
         zsys_debug ("fty-info-test: rest_path = '%s'", rest_root);
         zstr_free (&zuuid_reply);
         zstr_free (&cmd);
@@ -691,7 +710,7 @@ fty_info_server_test (bool verbose)
         zhash_autofree (ext);
         zhash_update (aux, "type", (void *) "device");
 	    zhash_update (aux, "subtype", (void *) "rackcontroller");
-	    zhash_update (aux, "parent", (void *) parent);
+	    zhash_update (aux, "parent_name.1", (void *) parent);
         zhash_update (ext, "name", (void *) name);
         zhash_update (ext, "ip.1", (void *) "127.0.0.1");
 
@@ -701,7 +720,7 @@ fty_info_server_test (bool verbose)
                 FTY_PROTO_ASSET_OP_CREATE,
                 ext);
 
-        int rv = mlm_client_send (asset_generator, "device.rackcontroller@ipc-001", &msg);
+        int rv = mlm_client_send (asset_generator, "device.rackcontroller@rackcontroller-0", &msg);
         assert (rv == 0);
         zhash_destroy (&aux);
         zhash_destroy (&ext);
@@ -774,7 +793,7 @@ fty_info_server_test (bool verbose)
                 FTY_PROTO_ASSET_OP_UPDATE,
                 ext);
 
-        int rv = mlm_client_send (asset_generator, "device.rackcontroller@ipc-001", &msg);
+        int rv = mlm_client_send (asset_generator, "device.rackcontroller@rackcontroller-0", &msg);
         assert (rv == 0);
         zhash_destroy (&aux);
         zhash_destroy (&ext);
@@ -805,12 +824,12 @@ fty_info_server_test (bool verbose)
         while ( value != NULL )  {
             char *key = (char *) zhash_cursor (infos);   // key of this value
             zsys_debug ("fty-info-test: %s = %s",key,value);
-            /*if (streq (key, INFO_NAME))
-                assert (streq (value, TST_NAME));
-            if (streq (key, INFO_NAME_URI))
-                assert (streq (value, TST_NAME_URI));
-            if (streq (key, INFO_LOCATION_URI))
-                assert (streq (value, TST_LOCATION2_URI));*/
+            // if (streq (key, INFO_NAME))
+            //     assert (streq (value, TST_NAME));
+            // if (streq (key, INFO_NAME_URI))
+            //     assert (streq (value, TST_NAME_URI));
+            // if (streq (key, INFO_LOCATION_URI))
+            //     assert (streq (value, TST_LOCATION2_URI));
             value     = (char *) zhash_next (infos);   // next value
         }
         zstr_free (&zuuid_reply);
@@ -846,7 +865,7 @@ fty_info_server_test (bool verbose)
                 FTY_PROTO_ASSET_OP_CREATE,
                 ext);
 
-        int rv = mlm_client_send (asset_generator, "device.rack controller@ipc-001", &msg);
+        int rv = mlm_client_send (asset_generator, "device.rack controller@rackcontroller-0", &msg);
         assert (rv == 0);
         zhash_destroy (&aux);
         zhash_destroy (&ext);
@@ -878,12 +897,12 @@ fty_info_server_test (bool verbose)
         while ( value != NULL )  {
             char *key = (char *) zhash_cursor (infos);   // key of this value
             zsys_debug ("fty-info-test: %s = %s",key,value);
-            /*if (streq (key, INFO_NAME))
-                assert (streq (value, TST_NAME));
-            if (streq (key, INFO_NAME_URI))
-                assert (streq (value, TST_NAME_URI));
-            if (streq (key, INFO_LOCATION_URI))
-                assert (streq (value, TST_LOCATION2_URI));*/
+            // if (streq (key, INFO_NAME))
+            //     assert (streq (value, TST_NAME));
+            // if (streq (key, INFO_NAME_URI))
+            //     assert (streq (value, TST_NAME_URI));
+            // if (streq (key, INFO_LOCATION_URI))
+            //     assert (streq (value, TST_LOCATION2_URI));
             value     = (char *) zhash_next (infos);   // next value
         }
         zstr_free (&zuuid_reply);
@@ -944,9 +963,9 @@ fty_info_server_test (bool verbose)
         char * serial = (char *) zhash_lookup (infos, INFO_SERIAL);
         assert(serial && streq (serial, TST_SERIAL));
         zsys_debug ("fty-info-test: serial = '%s'", serial);
-        char * model = (char *) zhash_lookup (infos, INFO_MODEL);
-        assert(model && streq (model, TST_MODEL));
-        zsys_debug ("fty-info-test: model = '%s'", model);
+        char * product = (char *) zhash_lookup (infos, INFO_PRODUCT);
+        assert(product && streq (product, TST_PRODUCT));
+        zsys_debug ("fty-info-test: product = '%s'", product);
         char * location = (char *) zhash_lookup (infos, INFO_LOCATION);
         assert(location && streq (location, TST_LOCATION));
         zsys_debug ("fty-info-test: location = '%s'", location);
@@ -957,7 +976,7 @@ fty_info_server_test (bool verbose)
         assert(version && streq (version, TST_VERSION));
         zsys_debug ("fty-info-test: version = '%s'", version);
         char * rest_root = (char *) zhash_lookup (infos, INFO_REST_PATH);
-        assert(rest_root && streq (rest_root, TXT_PATH));
+        assert(rest_root && streq (rest_root, DEFAULT_PATH));
         zsys_debug ("fty-info-test: rest_path = '%s'", rest_root);
 
 
