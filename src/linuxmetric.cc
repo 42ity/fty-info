@@ -30,6 +30,7 @@
 #include <fstream>
 #include <sstream>
 #include <limits>
+#include <thread>
 #include <sys/statvfs.h>
 #include <cxxtools/directory.h>
 
@@ -174,6 +175,15 @@ s_cpu_usage (std::string &root_dir, zhashx_t *history)
     cpu_usage_info->type = strdup (LINUXMETRIC_CPU_USAGE);
     cpu_usage_info->value = s_round (100 - 100*((numerator - history_numerator)/(denominator - history_denominator)));
     cpu_usage_info->unit = "%";
+    
+    //get the number of cpu core and divide the final cpu usage value
+    unsigned int concurentThreadsSupported = std::thread::hardware_concurrency();
+    
+    //Change the value if number of core is more than 1
+    if (concurentThreadsSupported > 1) {
+        cpu_usage_info->value = s_round (cpu_usage_info->value / concurentThreadsSupported);
+    }
+    
     /* update or insert numerator and denominator to history */
     *history_numerator_ptr = numerator;
     *history_denominator_ptr = denominator;
