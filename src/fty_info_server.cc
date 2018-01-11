@@ -31,6 +31,7 @@
 #include <cxxtools/jsondeserializer.h>
 #include <istream>
 #include <fstream>
+#include <thread>
 #include <set>
 #include <map>
 #include <ifaddrs.h>
@@ -1066,7 +1067,15 @@ fty_info_server_test (bool verbose)
 
         assert (zhashx_lookup (metrics, LINUXMETRIC_CPU_USAGE));
         metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_CPU_USAGE);
-        assert (50 == atoi (fty_proto_value (metric)));
+        unsigned int concurentThreadsSupported = std::thread::hardware_concurrency();
+        int value = 50;
+        
+        if (concurentThreadsSupported > 1) {
+            double dvalue = 50 / concurentThreadsSupported;
+            value = (dvalue - floor(dvalue) > 0.5) ? ceil(dvalue) : floor(dvalue);
+        }
+        
+        assert (value == atoi (fty_proto_value (metric)));
 
         assert (zhashx_lookup (metrics, LINUXMETRIC_CPU_TEMPERATURE));
         metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_CPU_TEMPERATURE);
