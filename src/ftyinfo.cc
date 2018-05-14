@@ -122,6 +122,9 @@ s_get_release_details
             return NULL;
         }
     }
+    if (value.empty () && dfl) {
+	return strdup (dfl);
+    }
     return strdup(value.c_str());
 }
 
@@ -173,7 +176,7 @@ ftyinfo_new (topologyresolver_t *resolver, const char *path)
     self->uuid   = s_get_release_details (si, "uuid", NULL);
     self->vendor = s_get_release_details (si, "hardware-vendor", NULL);
     self->manufacturer = self->vendor;
-    self->serial = s_get_release_details (si, "hardware-serial-number", NULL);
+    self->serial = s_get_release_details (si, "hardware-serial-number", "N/A");
     self->product  = s_get_release_details (si, "hardware-catalog-number", NULL);
     self->part_number  = s_get_release_details (si, "hardware-part-number", NULL);
     self->version   = s_get_release_details (si, "osimage-name", NULL);
