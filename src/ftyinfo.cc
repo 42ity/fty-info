@@ -123,7 +123,7 @@ s_get_release_details
         }
     }
     if (value.empty () && dfl) {
-	return strdup (dfl);
+	    return strdup (dfl);
     }
     return strdup(value.c_str());
 }
