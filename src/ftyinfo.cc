@@ -72,7 +72,7 @@ s_get_installation_date (
             // TODO: we should probably check for time_t max/min, but hey!... ;)
             char chtmp[64];
             if (s_calendar_to_datetime ((time_t) i64, chtmp, 64) == -1) {
-                installation_date = "N/A - Error retrieveing installation date";
+                installation_date = "N/A - Error retrieving installation date";
                 throw std::runtime_error ("calendar_to_datetime () failed.");
             }
             installation_date.assign (chtmp);
