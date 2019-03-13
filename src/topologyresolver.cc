@@ -536,6 +536,7 @@ topologyresolver_test (bool verbose)
     assert (zhashx_size (resolver->assets) == 3);
     res = topologyresolver_to_string (resolver);
     assert (NULL == res);
+    free(res);
 
     topologyresolver_asset (resolver, msg3);
     assert (zhashx_size (resolver->assets) == 3);
