@@ -528,6 +528,7 @@ topologyresolver_test (bool verbose)
     char *res = topologyresolver_to_string (resolver);
     topologyresolver_asset (resolver, msg1);
     assert (NULL == res);
+    free(res);
 
     topologyresolver_asset (resolver, msg);
     assert (zhashx_size (resolver->assets) == 2);
@@ -536,6 +537,7 @@ topologyresolver_test (bool verbose)
     assert (zhashx_size (resolver->assets) == 3);
     res = topologyresolver_to_string (resolver);
     assert (NULL == res);
+    free(res);
 
     topologyresolver_asset (resolver, msg3);
     assert (zhashx_size (resolver->assets) == 3);
@@ -559,6 +561,7 @@ topologyresolver_test (bool verbose)
     topologyresolver_asset (resolver, msg4);
     res = topologyresolver_to_string (resolver);
     assert (NULL == res);
+    free(res);
 
     fty_proto_t *msg5 = fty_proto_new (FTY_PROTO_ASSET);
 
