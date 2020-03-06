@@ -4,9 +4,12 @@
 
 [Unit]
 Description=fty-info service
-After=malamute.service network.target
-Before=fty-asset.service
 Requires=malamute.service network.target
+After=malamute.service network.target
+#WAS#Before=fty-asset.service
+After=fty-asset.service
+Requires=fty-asset.service
+BindsTo=fty-asset.service
 PartOf=bios.target
 
 [Service]
