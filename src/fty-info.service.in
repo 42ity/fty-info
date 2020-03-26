@@ -16,7 +16,10 @@ Before=fty-asset.service
 ### Requires=fty-asset.service
 ### BindsTo=fty-asset.service
 
-PartOf=bios.target
+# fty-info/fty-mdns-sd should be pre-EULA, so that just-deployed instances
+# are visible on the network for remote (distributed, through central point)
+# commissioning, eventually.
+PartOf=bios-pre-eula.target
 
 [Service]
 Type=simple
@@ -34,4 +37,4 @@ Environment="prefix=@prefix@"
 ExecStart=@prefix@/bin/fty-info -c @sysconfdir@/@PACKAGE@/fty-info.cfg
 
 [Install]
-WantedBy=bios.target
+WantedBy=bios-pre-eula.target
