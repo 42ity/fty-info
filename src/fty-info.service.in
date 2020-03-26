@@ -2,10 +2,17 @@
 Description=fty-info service: serve metrics about this system as rackcontroller-0
 Requires=malamute.service network.target
 After=malamute.service network.target
+Conflicts=rescue.target shutdown.target poweroff.target halt.target reboot.target emergency.target
 #WAS#Before=fty-asset.service
 After=fty-asset.service
 Requires=fty-asset.service
 BindsTo=fty-asset.service
+
+Requisite=bios-allowed.target
+After=bios-allowed.target
+PartOf=bios-allowed.target
+BindsTo=bios-allowed.target
+Conflicts=bios-shutdown.target
 PartOf=bios.target
 
 [Service]
