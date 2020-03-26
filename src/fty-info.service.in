@@ -1,9 +1,5 @@
-# This is a skeleton created by zproject.
-# You can add hand-written code here.
-# ATTENTION: This file was manually edited.
-
 [Unit]
-Description=fty-info service
+Description=fty-info service: serve metrics about this system as rackcontroller-0
 Requires=malamute.service network.target
 After=malamute.service network.target
 #WAS#Before=fty-asset.service
