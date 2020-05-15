@@ -205,7 +205,21 @@ ftyinfo_new (topologyresolver_t *resolver, const char *path)
     // use default
     self->path = strdup (path);
     self->protocol_format = strdup (TXT_PROTO_FORMAT);
-    self->type = strdup (TXT_TYPE);
+    // update type (ipm-va by default)
+    std::string s_type = TXT_IPM_VA_TYPE;
+    if (self->product) {
+        if (strcmp (self->product, "IPC3000") == 0) {
+            s_type = TXT_IPC_TYPE;
+        }
+        else if (strcmp (self->product, "IPM Editions VA") == 0) {
+            s_type = TXT_IPM_VA_TYPE;
+        }
+        else if ((strcmp (self->product, "IPM Infra VA") == 0) ||
+                 (strcmp (self->product, "IPC3000E-LXC") == 0)) {
+            s_type = TXT_IPC_VA_TYPE;
+        }
+    }
+    self->type = strdup (s_type.c_str());
     self->txtvers   = strdup (TXT_VER);
     log_info ("fty-info:path = '%s'", self->path);
     log_info ("fty-info:protocol_format = '%s'", self->protocol_format);
@@ -269,7 +283,7 @@ ftyinfo_test_new (void)
     self->installDate = strdup (TST_INSTALL_DATE);
     self->path      = strdup (DEFAULT_PATH);
     self->protocol_format = strdup (TXT_PROTO_FORMAT);
-    self->type      = strdup (TXT_TYPE);
+    self->type      = strdup (TXT_IPC_TYPE);
     self->txtvers   = strdup (TXT_VER);
     return self;
 }
