@@ -121,21 +121,26 @@ info_server_destroy (fty_info_server_t  **self_p)
 }
 
 
-//return IPC (uuid first 8 digits)
+//return NAME (uuid first 8 digits)
 // the returned buffer should be freed
 static
-char *s_get_name(const char *name, const char *uuid)
+char *s_get_name(ftyinfo_t *info)
 {
-
-    char *buffer = (char*)malloc(strlen(name)+12);
-    char first_digit[9];
-    if (uuid) {
-        strncpy ( first_digit, uuid, 8 );
-    } else {
-        strncpy ( first_digit, DEFAULT_UUID, 8 );
+    std::string s_name = SRV_IPC_NAME;
+    if (info && info->type && info->product &&
+       (strcmp(info->type, TXT_IPC_TYPE) != 0) && (strcmp(info->type, TXT_IPC_VA_TYPE) != 0)) {
+        s_name = info->product;
     }
-    first_digit[8]='\0';
-    sprintf(buffer, "%s (%s)",name,first_digit);
+    char *buffer = (char *)malloc(s_name.length() + 12);
+    char first_digit[9];
+    const char *uuid = ftyinfo_uuid(info);
+    if (uuid) {
+        strncpy(first_digit, uuid, 8);
+    } else {
+        strncpy(first_digit, DEFAULT_UUID, 8);
+    }
+    first_digit[8] = '\0';
+    sprintf(buffer, "%s (%s)", s_name.c_str(), first_digit);
     return buffer;
 }
 
@@ -167,7 +172,7 @@ s_create_info (ftyinfo_t *info)
 {
     zmsg_t *msg=zmsg_new();
     zmsg_addstr (msg, FTY_INFO_CMD);
-    char *srv_name = s_get_name(SRV_NAME, ftyinfo_uuid(info));
+    char *srv_name = s_get_name(info);
     if (srv_name) {
         zmsg_addstr (msg, srv_name);
     } else {

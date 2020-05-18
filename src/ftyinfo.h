@@ -28,13 +28,15 @@ extern "C" {
 
 
 //default values
-#define SRV_NAME "IPC"
+#define SRV_IPC_NAME "IPC"
 #define SRV_TYPE "_https._tcp."
 #define SRV_STYPE "_powerservice._sub._https._tcp."
 #define SRV_PORT  "443"
 #define TXT_PATH  "/api/v1/comm"
 #define TXT_PROTO_FORMAT "etnrs"
-#define TXT_TYPE   "ipc"
+#define TXT_IPC_TYPE    "ipc"
+#define TXT_IPC_VA_TYPE "ipc-va"
+#define TXT_IPM_VA_TYPE "ipm-va"
 #define TXT_VER  "1"
 
 //test value for INFO-TEST command reply
