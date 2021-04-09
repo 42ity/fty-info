@@ -49,24 +49,26 @@ struct _linuxmetric_t {
     const char *unit;
 };
 
+typedef struct _linuxmetric_t linuxmetric_t;
+
 //  @interface
 //  Create a new linuxmetric
-FTY_INFO_EXPORT linuxmetric_t *
+linuxmetric_t *
     linuxmetric_new (void);
 
 //  Destroy the linuxmetric
-FTY_INFO_EXPORT void
+void
     linuxmetric_destroy (linuxmetric_t **self_p);
 
 // Create zlistx containing all Linux system info
-FTY_INFO_EXPORT zlistx_t *
+zlistx_t *
     linuxmetric_get_all
     (int interval,
      zhashx_t *history,
      std::string &root_dir,
      bool metrics_test);
 
-FTY_INFO_EXPORT zhashx_t *
+zhashx_t *
     linuxmetric_list_interfaces (std::string &root_dir);
 //  @end
 

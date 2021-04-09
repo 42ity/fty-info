@@ -55,6 +55,8 @@ struct _fty_info_server_t {
     char *hw_cap_path;
 };
 
+typedef struct _fty_info_server_t fty_info_server_t;
+
 // this is kept for to handle with values set to ""
 const char*
 s_get (zconfig_t *config, const char* key, const char*dfl) {

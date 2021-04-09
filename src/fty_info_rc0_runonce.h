@@ -28,19 +28,19 @@ extern "C" {
 
 //  @interface
 //  Create a new fty_info_rc0_runonce
-FTY_INFO_PRIVATE fty_info_rc0_runonce_t *
+fty_info_rc0_runonce_t *
     fty_info_rc0_runonce_new (char *name);
 
 //  Destroy the fty_info_rc0_runonce
-FTY_INFO_PRIVATE void
+void
     fty_info_rc0_runonce_destroy (fty_info_rc0_runonce_t **self_p);
 
 //  Run once agent to update rackcontroller-0 first time it is created
-FTY_INFO_EXPORT void
+void
     fty_info_rc0_runonce (zsock_t *pipe, void *args);
 
 //  Self test of this class
-FTY_INFO_PRIVATE void
+void
     fty_info_rc0_runonce_test (bool verbose);
 
 //  @end
