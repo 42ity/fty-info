@@ -133,7 +133,7 @@ char *s_get_name(ftyinfo_t *info)
        (strcmp(info->type, TXT_IPC_TYPE) != 0) && (strcmp(info->type, TXT_IPC_VA_TYPE) != 0)) {
         s_name = info->product;
     }
-    char *buffer = (char *)malloc(s_name.length() + 12);
+    char *buffer = static_cast<char *>(malloc(s_name.length() + 12));
     char first_digit[9];
     const char *uuid = ftyinfo_uuid(info);
 #if __GNUC__ >= 8
@@ -250,7 +250,7 @@ s_publish_linuxmetrics (fty_info_server_t  * self)
     int ttl = 3 * self->linuxmetrics_interval; // in seconds
     char *rc_iname = topologyresolver_id (self->resolver);
 
-    linuxmetric_t *metric = (linuxmetric_t *) zlistx_first (info);
+    linuxmetric_t *metric = static_cast<linuxmetric_t *>(zlistx_first (info));
     while (metric) {
         char *value = zsys_sprintf ("%lf", metric->value);
         log_debug ("Publishing metric %s, value %lf, unit %s", metric->type , metric->value, metric->unit);
@@ -262,7 +262,7 @@ s_publish_linuxmetrics (fty_info_server_t  * self)
             log_error ("Can't publish metric %s", metric->type);
         }
         linuxmetric_destroy (&metric);
-        metric = (linuxmetric_t *) zlistx_next (info);
+        metric = static_cast<linuxmetric_t *>(zlistx_next (info));
         zstr_free (&value);
     }
 
@@ -368,7 +368,7 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
     else if (streq (command, "LINUXMETRICSINTERVAL")) {
         char *interval = zmsg_popstr (message);
         log_info ("Will be publishing metrics each %s seconds", interval);
-        self->linuxmetrics_interval = (int) strtol (interval, NULL, 10);
+        self->linuxmetrics_interval = static_cast<int>(strtol (interval, NULL, 10));
         zstr_free (&interval);
     }
     else if (streq (command, "ROOT_DIR")) {
@@ -404,7 +404,7 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
 void fty_msg_free_fn(void *data)
 {
     if (!data) return;
-    fty_proto_t *msg = (fty_proto_t *)data;
+    fty_proto_t *msg = static_cast<fty_proto_t *>(data);
     fty_proto_destroy (&msg);
 }
 
@@ -607,7 +607,7 @@ s_handle_mailbox(fty_info_server_t* self,zmsg_t *message)
 void
 fty_info_server (zsock_t *pipe, void *args)
 {
-    char *name = (char *)args;
+    char *name = static_cast<char *>(args);
     if (!name) {
         log_error ("Address for fty-info actor is NULL");
         return;
@@ -664,11 +664,11 @@ fty_info_server_test (bool verbose)
     printf (" * fty_info_server_test: ");
 
     // Note: If your selftest reads SCMed fixture data, please keep it in
-    // src/selftest-ro; if your test creates filesystem objects, please
-    // do so under src/selftest-rw. They are defined below along with a
+    // src/test/selftest-ro; if your test creates filesystem objects, please
+    // do so under src/test/selftest-rw. They are defined below along with a
     // usecase for the variables (assert) to make compilers happy.
-    const char *SELFTEST_DIR_RO = "src/selftest-ro";
-    const char *SELFTEST_DIR_RW = "src/selftest-rw";
+    const char *SELFTEST_DIR_RO = "selftest-ro";
+    const char *SELFTEST_DIR_RW = "selftest-rw";
     assert (SELFTEST_DIR_RO);
     assert (SELFTEST_DIR_RW);
     assert (fty_shm_set_test_dir(SELFTEST_DIR_RW) == 0);
@@ -677,7 +677,7 @@ fty_info_server_test (bool verbose)
 
     static const char* endpoint = "inproc://fty-info-test";
 
-    zactor_t *server = zactor_new (mlm_server, (void*) "Malamute");
+    zactor_t *server = zactor_new (mlm_server, (void*)"Malamute");
     zstr_sendx (server, "BIND", endpoint, NULL);
 
     mlm_client_t *client = mlm_client_new ();
@@ -725,37 +725,37 @@ fty_info_server_test (bool verbose)
         zframe_t *frame_infos = zmsg_next (recv);
         zhash_t *infos = zhash_unpack(frame_infos);
 
-        char * uuid = (char *) zhash_lookup (infos, INFO_UUID);
+        char * uuid = static_cast<char *>(zhash_lookup (infos, INFO_UUID));
         assert(uuid && streq (uuid,TST_UUID));
         log_debug ("fty-info-test: uuid = '%s'", uuid);
-        char * hostname = (char *) zhash_lookup (infos, INFO_HOSTNAME);
+        char * hostname = static_cast<char *>(zhash_lookup (infos, INFO_HOSTNAME));
         assert(hostname && streq (hostname, TST_HOSTNAME));
         log_debug ("fty-info-test: hostname = '%s'", hostname);
-        char * name = (char *) zhash_lookup (infos, INFO_NAME);
+        char * name = static_cast<char *>(zhash_lookup (infos, INFO_NAME));
         assert(name && streq (name, TST_NAME));
         log_debug ("fty-info-test: name = '%s'", name);
-        char * name_uri = (char *) zhash_lookup (infos, INFO_NAME_URI);
+        char * name_uri = static_cast<char *>(zhash_lookup (infos, INFO_NAME_URI));
         assert(name_uri && streq (name_uri, TST_NAME_URI));
         log_debug ("fty-info-test: name_uri = '%s'", name_uri);
-        char * vendor = (char *) zhash_lookup (infos, INFO_VENDOR);
+        char * vendor = static_cast<char *>(zhash_lookup (infos, INFO_VENDOR));
         assert(vendor && streq (vendor, TST_VENDOR));
         log_debug ("fty-info-test: vendor = '%s'", vendor);
-        char * serial = (char *) zhash_lookup (infos, INFO_SERIAL);
+        char * serial = static_cast<char *>(zhash_lookup (infos, INFO_SERIAL));
         assert(serial && streq (serial, TST_SERIAL));
         log_debug ("fty-info-test: serial = '%s'", serial);
-        char * product = (char *) zhash_lookup (infos, INFO_PRODUCT);
+        char * product = static_cast<char *>(zhash_lookup (infos, INFO_PRODUCT));
         assert(product && streq (product, TST_PRODUCT));
         log_debug ("fty-info-test: product = '%s'", product);
-        char * location = (char *) zhash_lookup (infos, INFO_LOCATION);
+        char * location = static_cast<char *>(zhash_lookup (infos, INFO_LOCATION));
         assert(location && streq (location, TST_LOCATION));
         log_debug ("fty-info-test: location = '%s'", location);
-        char * parent_uri = (char *) zhash_lookup (infos, INFO_PARENT_URI);
+        char * parent_uri = static_cast<char *>(zhash_lookup (infos, INFO_PARENT_URI));
         assert(parent_uri && streq (parent_uri, TST_PARENT_URI));
         log_debug ("fty-info-test: parent_uri = '%s'", parent_uri);
-        char * version = (char *) zhash_lookup (infos, INFO_VERSION);
+        char * version = static_cast<char *>(zhash_lookup (infos, INFO_VERSION));
         assert(version && streq (version, TST_VERSION));
         log_debug ("fty-info-test: version = '%s'", version);
-        char * rest_root = (char *) zhash_lookup (infos, INFO_REST_PATH);
+        char * rest_root = static_cast<char *>(zhash_lookup (infos, INFO_REST_PATH));
         assert(rest_root && streq (rest_root, DEFAULT_PATH));
         log_debug ("fty-info-test: rest_path = '%s'", rest_root);
         zstr_free (&zuuid_reply);
@@ -796,11 +796,11 @@ fty_info_server_test (bool verbose)
         zframe_t *frame_infos = zmsg_next (recv);
         zhash_t *infos = zhash_unpack(frame_infos);
 
-        char *value = (char *) zhash_first (infos);   // first value
+        char *value = static_cast<char *>(zhash_first (infos));   // first value
         while ( value != NULL )  {
-            char *key = (char *) zhash_cursor (infos);   // key of this value
+            char *key = const_cast<char *>(zhash_cursor (infos));   // key of this value
             log_debug ("fty-info-test: %s = %s",key,value);
-            value     = (char *) zhash_next (infos);   // next value
+            value     = static_cast<char *>(zhash_next (infos));   // next value
         }
         zstr_free (&zuuid_reply);
         zstr_free (&cmd);
@@ -866,9 +866,9 @@ fty_info_server_test (bool verbose)
         zframe_t *frame_infos = zmsg_next (recv);
         zhash_t *infos = zhash_unpack(frame_infos);
 
-        char *value = (char *) zhash_first (infos);   // first value
+        char *value = static_cast<char *>(zhash_first (infos));   // first value
         while ( value != NULL )  {
-            char *key = (char *) zhash_cursor (infos);   // key of this value
+            char *key = const_cast<char *>(zhash_cursor (infos));   // key of this value
             log_debug ("fty-info-test: %s = %s",key,value);
             if (streq (key, INFO_NAME))
                 assert (streq (value, TST_NAME));
@@ -876,7 +876,7 @@ fty_info_server_test (bool verbose)
                 assert (streq (value, TST_NAME_URI));
             if (streq (key, INFO_PARENT_URI))
                 assert (streq (value, TST_PARENT_URI));
-            value     = (char *) zhash_next (infos);   // next value
+            value     = static_cast<char *>(zhash_next (infos));   // next value
         }
         zstr_free (&zuuid_reply);
         zstr_free (&cmd);
@@ -938,9 +938,9 @@ fty_info_server_test (bool verbose)
         zframe_t *frame_infos = zmsg_next (recv);
         zhash_t *infos = zhash_unpack(frame_infos);
 
-        char *value = (char *) zhash_first (infos);   // first value
+        char *value = static_cast<char *>(zhash_first (infos));   // first value
         while ( value != NULL )  {
-            char *key = (char *) zhash_cursor (infos);   // key of this value
+            char *key = const_cast<char *>(zhash_cursor (infos));   // key of this value
             log_debug ("fty-info-test: %s = %s",key,value);
             // if (streq (key, INFO_NAME))
             //     assert (streq (value, TST_NAME));
@@ -948,7 +948,7 @@ fty_info_server_test (bool verbose)
             //     assert (streq (value, TST_NAME_URI));
             // if (streq (key, INFO_LOCATION_URI))
             //     assert (streq (value, TST_LOCATION2_URI));
-            value     = (char *) zhash_next (infos);   // next value
+            value     = static_cast<char *>(zhash_next (infos));   // next value
         }
         zstr_free (&zuuid_reply);
         zstr_free (&cmd);
@@ -1011,9 +1011,9 @@ fty_info_server_test (bool verbose)
         zframe_t *frame_infos = zmsg_next (recv);
         zhash_t *infos = zhash_unpack(frame_infos);
 
-        char *value = (char *) zhash_first (infos);   // first value
+        char *value = static_cast<char *>(zhash_first (infos));   // first value
         while ( value != NULL )  {
-            char *key = (char *) zhash_cursor (infos);   // key of this value
+            char *key = const_cast<char *>(zhash_cursor (infos));   // key of this value
             log_debug ("fty-info-test: %s = %s",key,value);
             // if (streq (key, INFO_NAME))
             //     assert (streq (value, TST_NAME));
@@ -1021,7 +1021,7 @@ fty_info_server_test (bool verbose)
             //     assert (streq (value, TST_NAME_URI));
             // if (streq (key, INFO_LOCATION_URI))
             //     assert (streq (value, TST_LOCATION2_URI));
-            value     = (char *) zhash_next (infos);   // next value
+            value     = static_cast<char *>(zhash_next (infos));   // next value
         }
         zstr_free (&zuuid_reply);
         zstr_free (&cmd);
@@ -1063,37 +1063,37 @@ fty_info_server_test (bool verbose)
         zframe_t *frame_infos = zmsg_next (recv);
         zhash_t *infos = zhash_unpack(frame_infos);
 
-        char * uuid = (char *) zhash_lookup (infos, INFO_UUID);
+        char * uuid = static_cast<char *>(zhash_lookup (infos, INFO_UUID));
         assert(uuid && streq (uuid,TST_UUID));
         log_debug ("fty-info-test: uuid = '%s'", uuid);
-        char * hostname = (char *) zhash_lookup (infos, INFO_HOSTNAME);
+        char * hostname = static_cast<char *>(zhash_lookup (infos, INFO_HOSTNAME));
         assert(hostname && streq (hostname, TST_HOSTNAME));
         log_debug ("fty-info-test: hostname = '%s'", hostname);
-        char * name = (char *) zhash_lookup (infos, INFO_NAME);
+        char * name = static_cast<char *>(zhash_lookup (infos, INFO_NAME));
         assert(name && streq (name, TST_NAME));
         log_debug ("fty-info-test: name = '%s'", name);
-        char * name_uri = (char *) zhash_lookup (infos, INFO_NAME_URI);
+        char * name_uri = static_cast<char *>(zhash_lookup (infos, INFO_NAME_URI));
         assert(name_uri && streq (name_uri, TST_NAME_URI));
         log_debug ("fty-info-test: name_uri = '%s'", name_uri);
-        char * vendor = (char *) zhash_lookup (infos, INFO_VENDOR);
+        char * vendor = static_cast<char *>(zhash_lookup (infos, INFO_VENDOR));
         assert(vendor && streq (vendor, TST_VENDOR));
         log_debug ("fty-info-test: vendor = '%s'", vendor);
-        char * serial = (char *) zhash_lookup (infos, INFO_SERIAL);
+        char * serial = static_cast<char *>(zhash_lookup (infos, INFO_SERIAL));
         assert(serial && streq (serial, TST_SERIAL));
         log_debug ("fty-info-test: serial = '%s'", serial);
-        char * product = (char *) zhash_lookup (infos, INFO_PRODUCT);
+        char * product = static_cast<char *>(zhash_lookup (infos, INFO_PRODUCT));
         assert(product && streq (product, TST_PRODUCT));
         log_debug ("fty-info-test: product = '%s'", product);
-        char * location = (char *) zhash_lookup (infos, INFO_LOCATION);
+        char * location = static_cast<char *>(zhash_lookup (infos, INFO_LOCATION));
         assert(location && streq (location, TST_LOCATION));
         log_debug ("fty-info-test: location = '%s'", location);
-        char * parent_uri = (char *) zhash_lookup (infos, INFO_PARENT_URI);
+        char * parent_uri = static_cast<char *>(zhash_lookup (infos, INFO_PARENT_URI));
         assert(parent_uri && streq (parent_uri, TST_PARENT_URI));
         log_debug ("fty-info-test: parent_uri = '%s'", parent_uri);
-        char * version = (char *) zhash_lookup (infos, INFO_VERSION);
+        char * version = static_cast<char *>(zhash_lookup (infos, INFO_VERSION));
         assert(version && streq (version, TST_VERSION));
         log_debug ("fty-info-test: version = '%s'", version);
-        char * rest_root = (char *) zhash_lookup (infos, INFO_REST_PATH);
+        char * rest_root = static_cast<char *>(zhash_lookup (infos, INFO_REST_PATH));
         assert(rest_root && streq (rest_root, DEFAULT_PATH));
         log_debug ("fty-info-test: rest_path = '%s'", rest_root);
 
@@ -1126,13 +1126,13 @@ fty_info_server_test (bool verbose)
         zclock_sleep (1000);
 
         zhashx_t *metrics = zhashx_new ();
-        zhashx_set_destructor (metrics, (void (*)(void**)) fty_proto_destroy);
+        zhashx_set_destructor (metrics, reinterpret_cast<void (*)(void**)>(fty_proto_destroy));
         // we have 12 non-network metrics
         size_t number_metrics = 12;
         zhashx_t *interfaces = linuxmetric_list_interfaces (root_dir);
-        const char *state = (const char *) zhashx_first (interfaces);
+        const char *state = static_cast<const char *>(zhashx_first (interfaces));
         while (state != NULL)  {
-            const char *iface = (const char *) zhashx_cursor (interfaces);
+            const char *iface = static_cast<const char *>(zhashx_cursor (interfaces));
             log_debug ("interface %s = %s", iface, state);
 
             if (streq (state, "up")) {
@@ -1140,7 +1140,7 @@ fty_info_server_test (bool verbose)
               // for both rx and tx
               number_metrics+=(2*3);
             }
-            state = (const char *) zhashx_next (interfaces);
+            state = static_cast<const char *>(zhashx_next (interfaces));
         }
         {
           zclock_sleep (1000);
@@ -1155,74 +1155,74 @@ fty_info_server_test (bool verbose)
         }
 
         assert (zhashx_lookup (metrics, LINUXMETRIC_UPTIME));
-        fty_proto_t *metric = (fty_proto_t *) zhashx_lookup (metrics, LINUXMETRIC_UPTIME);
+        fty_proto_t *metric = static_cast<fty_proto_t *>(zhashx_lookup (metrics, LINUXMETRIC_UPTIME));
         assert (1000000 == atoi (fty_proto_value (metric)));
 
         assert (zhashx_lookup (metrics, LINUXMETRIC_CPU_USAGE));
-        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_CPU_USAGE);
+        metric = static_cast<fty_proto_t *>(zhashx_lookup (metrics,LINUXMETRIC_CPU_USAGE));
         assert (50 == atoi (fty_proto_value (metric)));
 
         assert (zhashx_lookup (metrics, LINUXMETRIC_CPU_TEMPERATURE));
-        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_CPU_TEMPERATURE);
+        metric = static_cast<fty_proto_t *>(zhashx_lookup (metrics,LINUXMETRIC_CPU_TEMPERATURE));
         assert (50 == atoi (fty_proto_value (metric)));
 
         assert (zhashx_lookup (metrics, LINUXMETRIC_MEMORY_TOTAL));
-        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_MEMORY_TOTAL);
+        metric = static_cast<fty_proto_t *>(zhashx_lookup (metrics,LINUXMETRIC_MEMORY_TOTAL));
         assert (4096 == atoi (fty_proto_value (metric)));
 
         assert (zhashx_lookup (metrics, LINUXMETRIC_MEMORY_USED));
-        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_MEMORY_USED);
+        metric = static_cast<fty_proto_t *>(zhashx_lookup (metrics,LINUXMETRIC_MEMORY_USED));
         assert (1024 == atoi (fty_proto_value (metric)));
 
         assert (zhashx_lookup (metrics, LINUXMETRIC_MEMORY_USAGE));
-        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_MEMORY_USAGE);
+        metric = static_cast<fty_proto_t *>(zhashx_lookup (metrics,LINUXMETRIC_MEMORY_USAGE));
         assert (25 == atoi (fty_proto_value (metric)));
 
         assert (zhashx_lookup (metrics, LINUXMETRIC_DATA0_TOTAL));
-        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_DATA0_TOTAL);
+        metric = static_cast<fty_proto_t *>(zhashx_lookup (metrics,LINUXMETRIC_DATA0_TOTAL));
         assert (10 == atoi (fty_proto_value (metric)));
 
         assert (zhashx_lookup (metrics, LINUXMETRIC_DATA0_USED));
-        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_DATA0_USED);
+        metric = static_cast<fty_proto_t *>(zhashx_lookup (metrics,LINUXMETRIC_DATA0_USED));
         assert (1 == atoi (fty_proto_value (metric)));
 
         assert (zhashx_lookup (metrics, LINUXMETRIC_DATA0_USAGE));
-        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_DATA0_USAGE);
+        metric = static_cast<fty_proto_t *>(zhashx_lookup (metrics,LINUXMETRIC_DATA0_USAGE));
         assert (10 == atoi (fty_proto_value (metric)));
 
         assert (zhashx_lookup (metrics, LINUXMETRIC_SYSTEM_TOTAL));
-        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_SYSTEM_TOTAL);
+        metric = static_cast<fty_proto_t *>(zhashx_lookup (metrics,LINUXMETRIC_SYSTEM_TOTAL));
         assert (10 == atoi (fty_proto_value (metric)));
 
         assert (zhashx_lookup (metrics, LINUXMETRIC_SYSTEM_USED));
-        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_SYSTEM_USED);
+        metric = static_cast<fty_proto_t *>(zhashx_lookup (metrics,LINUXMETRIC_SYSTEM_USED));
         assert (5 == atoi (fty_proto_value (metric)));
 
         assert (zhashx_lookup (metrics, LINUXMETRIC_SYSTEM_USAGE));
-        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_SYSTEM_USAGE);
+        metric = static_cast<fty_proto_t *>(zhashx_lookup (metrics,LINUXMETRIC_SYSTEM_USAGE));
         assert (50 == atoi (fty_proto_value (metric)));
 
-        state = (const char *) zhashx_first (interfaces);
+        state = static_cast<const char *>(zhashx_first (interfaces));
         while (state != NULL)  {
-            const char *iface = (const char *) zhashx_cursor (interfaces);
+            const char *iface = static_cast<const char *>(zhashx_cursor (interfaces));
             log_debug ("interface %s = %s", iface, state);
 
             if (streq (state, "up")) {
                 char *rx_bandwidth = zsys_sprintf (BANDWIDTH_TEMPLATE, "rx", iface);
                 assert (zhashx_lookup (metrics, rx_bandwidth));
-                metric = (fty_proto_t *) zhashx_lookup (metrics, rx_bandwidth);
+                metric = static_cast<fty_proto_t *>(zhashx_lookup (metrics, rx_bandwidth));
                 assert (33333 == atoi (fty_proto_value (metric)));
                 zstr_free (&rx_bandwidth);
 
                 char *rx_bytes = zsys_sprintf (BYTES_TEMPLATE, "rx", iface);
                 assert (zhashx_lookup (metrics, rx_bytes));
-                metric = (fty_proto_t *) zhashx_lookup (metrics, rx_bytes);
+                metric = static_cast<fty_proto_t *>(zhashx_lookup (metrics, rx_bytes));
                 assert (1000000 == atoi (fty_proto_value (metric)));
                 zstr_free (&rx_bytes);
 
                 char *rx_error_ratio = zsys_sprintf (ERROR_RATIO_TEMPLATE, "rx", iface);
                 assert (zhashx_lookup (metrics, rx_error_ratio));
-                metric = (fty_proto_t *) zhashx_lookup (metrics, rx_error_ratio);
+                metric = static_cast<fty_proto_t *>(zhashx_lookup (metrics, rx_error_ratio));
                 if (streq (iface, "LAN1"))
                     assert (1 == atoi (fty_proto_value (metric)));
                 else
@@ -1231,26 +1231,26 @@ fty_info_server_test (bool verbose)
 
                 char *tx_bandwidth = zsys_sprintf (BANDWIDTH_TEMPLATE, "tx", iface);
                 assert (zhashx_lookup (metrics, tx_bandwidth));
-                metric = (fty_proto_t *) zhashx_lookup (metrics, tx_bandwidth);
+                metric = static_cast<fty_proto_t *>(zhashx_lookup (metrics, tx_bandwidth));
                 assert (33333 == atoi (fty_proto_value (metric)));
                 zstr_free (&tx_bandwidth);
 
                 char *tx_bytes = zsys_sprintf (BYTES_TEMPLATE, "tx", iface);
                 assert (zhashx_lookup (metrics, tx_bytes));
-                metric = (fty_proto_t *) zhashx_lookup (metrics, tx_bytes);
+                metric = static_cast<fty_proto_t *>(zhashx_lookup (metrics, tx_bytes));
                 assert (1000000 == atoi (fty_proto_value (metric)));
                 zstr_free (&tx_bytes);
 
                 char *tx_error_ratio = zsys_sprintf (ERROR_RATIO_TEMPLATE, "tx", iface);
                 assert (zhashx_lookup (metrics, tx_error_ratio));
-                metric = (fty_proto_t *) zhashx_lookup (metrics, tx_error_ratio);
+                metric = static_cast<fty_proto_t *>(zhashx_lookup (metrics, tx_error_ratio));
                 if (streq (iface, "LAN1"))
                     assert (50 == atoi (fty_proto_value (metric)));
                 else
                     assert (0 == atoi (fty_proto_value (metric)));
                 zstr_free (&tx_error_ratio);
             }
-            state = (const char *) zhashx_next (interfaces);
+            state = static_cast<const char *>(zhashx_next (interfaces));
         }
 
         zhashx_destroy (&interfaces);
@@ -1260,7 +1260,7 @@ fty_info_server_test (bool verbose)
     {
         // TEST #8: hw capability info
         log_info ("fty-info-test:Test #8: starting");
-        zstr_sendx (info_server, "CONFIG", "./src/selftest-ro/data/hw_cap", NULL);
+        zstr_sendx (info_server, "CONFIG", "./selftest-ro/data/hw_cap", NULL);
 
         zmsg_t *hw_req = zmsg_new ();
         zmsg_addstr (hw_req, "HW_CAP");
