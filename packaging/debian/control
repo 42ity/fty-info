@@ -1,7 +1,7 @@
 #
-#    fty-info - Agent which returns rack controller information
+#    fty-info - Agent providing IPM2 system information
 #
-#    Copyright (C) 2014 - 2020 Eaton
+#    Copyright (C) 2014 - 2021 Eaton
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -23,6 +23,8 @@ Priority:       optional
 Maintainer:     fty-info Developers <eatonipcopensource@eaton.com>
 Standards-Version: 4.0.1.0
 Build-Depends: debhelper (>= 9),
+    cmake (>=3.0),
+    fty-cmake-dev,
     pkg-config,
     libsodium-dev,
     libzmq3-dev,
@@ -38,45 +40,8 @@ Build-Depends: debhelper (>= 9),
     asciidoc-base | asciidoc, xmlto,
     dh-autoreconf
 
-Package: libfty-info1
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
-Description: fty-info shared library
- This package contains shared library for fty-info:
- agent which returns rack controller information
-
-Package: libfty-info-dev
-Architecture: any
-Section: libdevel
-Depends:
-    ${misc:Depends},
-    libsodium-dev,
-    libzmq3-dev,
-    libczmq-dev (>= 3.0.2),
-    libmlm-dev (>= 1.0.0),
-    libfty-common-logging-dev,
-    libfty-proto-dev (>= 1.0.0),
-    libcxxtools-dev,
-    libfty-shm-dev (>= 1.0.0),
-    libfty-info1 (= ${binary:Version})
-Description: fty-info development tools
- This package contains development files for fty-info:
- agent which returns rack controller information
-
 Package: fty-info
 Architecture: any
 Depends: ${misc:Depends}, ${shlibs:Depends},
 Description: runnable binaries from fty-info
- Main package for fty-info:
- agent which returns rack controller information
-
-Package: fty-info-dbg
-Architecture: any
-Section: debug
-Priority: optional
-Depends:
-    fty-info (= ${binary:Version}),
-    ${misc:Depends}
-Description: fty-info debugging symbols
- This package contains the debugging symbols for fty-info:
- agent which returns rack controller information.
+ Agent providing IPM2 system information

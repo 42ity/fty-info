@@ -30,6 +30,15 @@ src/fty_info_selftest
 *.app
 core
 
+
+# Generated Debian files
+packaging/debian/.debhelper/
+packaging/debian/debhelper-build-stamp
+packaging/debian/files
+packaging/debian/*.substvars
+packaging/debian/*.debhelper
+packaging/debian/fty-info/
+
 # Distcheck workspace and archives
 fty-info-*/
 fty-info-*.tar.gz
@@ -133,3 +142,5 @@ nbproject/
 # CMake in general
 builds/cmake/
 *.cmake
+obj-x86_64-linux-gnu/
+
