@@ -27,7 +27,7 @@
 #define FTY_INFO_CLASSES_H_INCLUDED
 
 //  Platform definitions, must come first
-#include "platform.h"
+//#include "platform.h"
 
 //  External API
 #include "fty_info.h"
