@@ -34,14 +34,14 @@ etn_target(exe ${PROJECT_NAME}
 etn_configure_file(
     resources/${PROJECT_NAME}.cfg.in
     TARGET      ${PROJECT_NAME}
-    DESTINATION ${CMAKE_INSTALL_FULL_SYSCONFDIR}/${PROJECT_NAME}
+    DESTINATION "${CMAKE_INSTALL_SYSCONFDIR}/${PROJECT_NAME}"
 )
 
 # systemd unit
 etn_configure_file(
     resources/${PROJECT_NAME}.service.in
     TARGET      ${PROJECT_NAME}
-    DESTINATION /lib/systemd/system/
+    DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/systemd/system/"
 )
 
 if (BUILD_TESTING)
@@ -55,7 +55,6 @@ if (BUILD_TESTING)
             src/fty_info_rc0_runonce.cc
             src/test/main.cc
             src/fty_info_private_selftest.cc
-            #src/fty_info_selftest.cc  
             src/*.h
         PREPROCESSOR -DCATCH_CONFIG_FAST_COMPILE
         USES_PRIVATE
