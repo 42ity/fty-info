@@ -163,7 +163,7 @@ s_purge_message_cache (topologyresolver_t *self)
 
     const char *iname = static_cast<char *>(zlistx_first (inames));
     while (iname) {
-        if (! zlistx_find (topo, static_cast<void *>(iname)) && ! streq (self->iname, iname)) {
+        if (! zlistx_find (topo, (void *)iname) && ! streq (self->iname, iname)) {
             // asset is not me neither parent
             zhashx_delete (self->assets, iname);
         }
@@ -185,8 +185,8 @@ topologyresolver_new (const char *iname)
     if (iname) self->iname = strdup (iname);
     self->state = DISCOVERING;
     self->assets = zhashx_new ();
-    zhashx_set_destructor (self->assets, static_cast<czmq_destructor *>(fty_proto_destroy));
-    zhashx_set_duplicator (self->assets, static_cast<czmq_duplicator *>(fty_proto_dup));
+    zhashx_set_destructor (self->assets, (czmq_destructor *)(fty_proto_destroy));
+    zhashx_set_duplicator (self->assets, (czmq_duplicator *)(fty_proto_dup));
     self->client = mlm_client_new ();
     return self;
 }
