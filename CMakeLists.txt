@@ -22,7 +22,6 @@ etn_target(exe ${PROJECT_NAME}
     USES_PRIVATE
         czmq
         cxxtools
-        tntdb
         mlm
         fty_proto
         fty_common
