@@ -59,7 +59,6 @@ if (BUILD_TESTING)
         USES_PRIVATE
             czmq
             cxxtools
-            tntdb
             mlm
             fty_proto
             fty_common
