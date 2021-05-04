@@ -1,16 +1,22 @@
 # fty-info
 
-fty-info is an agent distributing information about RC on which IPM Infra software is running.
+fty-info is an agent providing IPM2 system information.
 
 ## How to build
 
 To build fty-info project run:
 
 ```bash
-./autogen.sh
-./configure
+mkdir build && cd build
+cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=usr -DBUILD_TESTING=On ..
 make
-make check # to run self-test
+sudo make install
+```
+
+Optionally, to run fty-outage tests run:
+
+```bash
+make test
 ```
 
 ## How to run

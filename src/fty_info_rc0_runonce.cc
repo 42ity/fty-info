@@ -336,7 +336,7 @@ handle_pipe(fty_info_rc0_runonce_t *self, zmsg_t *message)
 
 void fty_info_rc0_runonce (zsock_t *pipe, void *args)
 {
-    char *name = (char *)args;
+    char *name = static_cast<char *>(args);
     if (!name) {
         log_error ("Address for fty-info-rc0-runonce actor is NULL");
         return;
@@ -427,7 +427,7 @@ fty_info_rc0_runonce_test (bool verbose)
     //assert ( (str_SELFTEST_DIR_RW != "") );
     // NOTE that for "char*" context you need (str_SELFTEST_DIR_RO + "/myfilename").c_str()
 
-    fty_info_rc0_runonce_t *self = fty_info_rc0_runonce_new ((char *)"myself");
+    fty_info_rc0_runonce_t *self = fty_info_rc0_runonce_new (static_cast<char *>("myself"));
     assert (self);
     fty_info_rc0_runonce_destroy (&self);
     //  @end

@@ -1,4 +1,0 @@
-usr/bin/fty-info
-etc/fty-info/fty-info.cfg
-lib/systemd/system/fty-info.service
-

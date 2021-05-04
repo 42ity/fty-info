@@ -177,11 +177,11 @@ s_get_branding_info
 ftyinfo_t *
 ftyinfo_new (topologyresolver_t *resolver, const char *path)
 {
-    ftyinfo_t *self = (ftyinfo_t *) zmalloc (sizeof (ftyinfo_t));
+    ftyinfo_t *self = static_cast<ftyinfo_t *>(zmalloc (sizeof (ftyinfo_t)));
     self->infos = zhash_new();
 
     // set hostname
-    char *hostname = (char *) malloc (HOST_NAME_MAX+1);
+    char *hostname = static_cast<char *>(malloc (HOST_NAME_MAX+1));
     int rv = gethostname (hostname, HOST_NAME_MAX+1);
     if (rv == -1) {
         log_warning ("ftyinfo could not be fully initialized (error while getting the hostname)");
@@ -315,7 +315,7 @@ ftyinfo_new (topologyresolver_t *resolver, const char *path)
 ftyinfo_t *
 ftyinfo_test_new (void)
 {
-    ftyinfo_t *self = (ftyinfo_t *) zmalloc (sizeof (ftyinfo_t));
+    ftyinfo_t *self = static_cast<ftyinfo_t *>(zmalloc (sizeof (ftyinfo_t)));
     // TXT attributes
     self->infos     = zhash_new();
     self->id        = strdup (TST_ID);

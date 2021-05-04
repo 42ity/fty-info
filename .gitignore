@@ -1,6 +1,5 @@
 # This is a skeleton created by zproject.
 # You can add hand-written code here.
-### Note: General ignorance of CMake files has been added in gitignore; take care upon regens
 
 save.xml
 # Object files
@@ -30,6 +29,15 @@ src/fty_info_selftest
 *.out
 *.app
 core
+
+
+# Generated Debian files
+packaging/debian/.debhelper/
+packaging/debian/debhelper-build-stamp
+packaging/debian/files
+packaging/debian/*.substvars
+packaging/debian/*.debhelper
+packaging/debian/fty-info/
 
 # Distcheck workspace and archives
 fty-info-*/
@@ -133,5 +141,6 @@ nbproject/
 *~
 # CMake in general
 builds/cmake/
-CMake*
 *.cmake
+obj-x86_64-linux-gnu/
+

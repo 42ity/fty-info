@@ -27,10 +27,10 @@
 #define FTY_INFO_CLASSES_H_INCLUDED
 
 //  Platform definitions, must come first
-#include "platform.h"
+//#include "platform.h"
 
 //  External API
-#include "../include/fty_info.h"
+#include "fty_info.h"
 
 //  Opaque class structures to allow forward references
 #ifndef TOPOLOGYRESOLVER_T_DEFINED
@@ -50,27 +50,29 @@ typedef struct _fty_info_rc0_runonce_t fty_info_rc0_runonce_t;
 
 //  Internal API
 
+#include "fty_info_server.h"
 #include "topologyresolver.h"
 #include "ftyinfo.h"
 #include "fty_info_rc0_runonce.h"
+#include "linuxmetric.h"
 
 //  *** To avoid double-definitions, only define if building without draft ***
-#ifndef FTY_INFO_BUILD_DRAFT_API
+//#ifndef FTY_INFO_BUILD_DRAFT_API
 
 //  *** Draft method, defined for internal use only ***
 //  Self test of this class.
-FTY_INFO_PRIVATE void
+void
     topologyresolver_test (bool verbose);
 
 //  *** Draft method, defined for internal use only ***
 //  Self test of this class.
-FTY_INFO_PRIVATE void
+void
     fty_info_rc0_runonce_test (bool verbose);
 
 //  Self test for private classes
-FTY_INFO_PRIVATE void
+void
     fty_info_private_selftest (bool verbose, const char *subtest);
 
-#endif // FTY_INFO_BUILD_DRAFT_API
+//#endif // FTY_INFO_BUILD_DRAFT_API
 
 #endif

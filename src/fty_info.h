@@ -22,6 +22,13 @@
 #ifndef FTY_INFO_H_H_INCLUDED
 #define FTY_INFO_H_H_INCLUDED
 
+//  External dependencies
+#include <czmq.h>
+#include <malamute.h>
+#include <fty_log.h>
+#include <ftyproto.h>
+#include <cxxtools/allocator.h>
+#include <fty_shm.h>
 #include <iostream>
 #include <sstream>
 #include <cstddef>
@@ -30,7 +37,7 @@
 using namespace std;
 
 //  Include the project library file
-#include "fty_info_library.h"
+//#include "fty_info_library.h"
 
 //  Add your own public definitions here, if you need them
 #define FTY_INFO_AGENT  "fty-info"

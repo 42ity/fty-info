@@ -161,8 +161,8 @@ s_cpu_usage (std::string &root_dir, zhashx_t *history)
     double steal = s_get_field (line_cpu, 9);
     double numerator = idle + iowait;
     double denominator = user + nice + system + idle + iowait + irq + softirq + steal;
-    double *history_numerator_ptr = (double *) zhashx_lookup(history, HIST_CPU_NUMERATOR);
-    double *history_denominator_ptr = (double *) zhashx_lookup(history, HIST_CPU_DENOMINATOR);
+    double *history_numerator_ptr = static_cast<double *>(zhashx_lookup(history, HIST_CPU_NUMERATOR));
+    double *history_denominator_ptr = static_cast<double *>(zhashx_lookup(history, HIST_CPU_DENOMINATOR));
     double history_numerator = 0;
     double history_denominator = 0;
     if (NULL != history_numerator_ptr && NULL != history_denominator_ptr) {
@@ -328,7 +328,7 @@ static zlistx_t *
      std::string &root_dir)
 {
     char *last_key = zsys_sprintf ("%s_%s_%s", NETWORK_HISTORY_PREFIX, direction, interface);
-    double *value_last_ptr = (double *) zhashx_lookup(history, last_key);
+    double *value_last_ptr = static_cast<double *>(zhashx_lookup(history, last_key));
     double value_last = 0;
     if (NULL != value_last_ptr) {
         value_last = *value_last_ptr;
@@ -443,7 +443,7 @@ static linuxmetric_t *
 linuxmetric_t *
 linuxmetric_new (void)
 {
-    linuxmetric_t *self = (linuxmetric_t *) zmalloc (sizeof (linuxmetric_t));
+    linuxmetric_t *self = static_cast<linuxmetric_t *>(zmalloc (sizeof (linuxmetric_t)));
     assert (self);
     //  Initialize class properties here
     return self;
@@ -507,27 +507,27 @@ linuxmetric_get_all
         zlistx_add_end (info, cpu_temperature);
 
     zlistx_t *meminfo = s_meminfo (root_dir);
-    linuxmetric_t *mem_metric = (linuxmetric_t *) zlistx_first (meminfo);
+    linuxmetric_t *mem_metric = static_cast<linuxmetric_t *>(zlistx_first (meminfo));
     while (mem_metric) {
         zlistx_add_end (info, mem_metric);
-        mem_metric = (linuxmetric_t *) zlistx_next (meminfo);
+        mem_metric = static_cast<linuxmetric_t *>(zlistx_next (meminfo));
     }
     zlistx_destroy (&meminfo);
 
     if (!metrics_test) {
         zlistx_t *sdcard_info = s_sdcard_info (root_dir);
-        linuxmetric_t *sdcard_metric = (linuxmetric_t *) zlistx_first (sdcard_info);
+        linuxmetric_t *sdcard_metric = static_cast<linuxmetric_t *>(zlistx_first (sdcard_info));
         while (sdcard_metric) {
             zlistx_add_end (info, sdcard_metric);
-            sdcard_metric = (linuxmetric_t *) zlistx_next (sdcard_info);
+            sdcard_metric = static_cast<linuxmetric_t *>(zlistx_next (sdcard_info));
         }
         zlistx_destroy (&sdcard_info);
 
         zlistx_t *flash_info = s_flash_info (root_dir);
-        linuxmetric_t *flash_metric = (linuxmetric_t *) zlistx_first (flash_info);
+        linuxmetric_t *flash_metric = static_cast<linuxmetric_t *>(zlistx_first (flash_info));
         while (flash_metric) {
             zlistx_add_end (info, flash_metric);
-            flash_metric = (linuxmetric_t *) zlistx_next (flash_info);
+            flash_metric = static_cast<linuxmetric_t *>(zlistx_next (flash_info));
         }
         zlistx_destroy (&flash_info);
     }
@@ -579,18 +579,18 @@ linuxmetric_get_all
 
         if (streq (state, "up")) {
             zlistx_t *rx = s_network_usage (iface, "rx", interval, history, root_dir);
-            linuxmetric_t *network_usage_metric = (linuxmetric_t *) zlistx_first (rx);
+            linuxmetric_t *network_usage_metric = static_cast<linuxmetric_t *>(zlistx_first (rx));
             while (network_usage_metric) {
                 zlistx_add_end (info, network_usage_metric);
-                network_usage_metric = (linuxmetric_t *) zlistx_next (rx);
+                network_usage_metric = static_cast<linuxmetric_t *>(zlistx_next (rx));
             }
             zlistx_destroy (&rx);
 
             zlistx_t *tx = s_network_usage (iface, "tx", interval, history, root_dir);
-            network_usage_metric = (linuxmetric_t *) zlistx_first (tx);
+            network_usage_metric = static_cast<linuxmetric_t *>(zlistx_first (tx));
             while (network_usage_metric) {
                 zlistx_add_end (info, network_usage_metric);
-                network_usage_metric = (linuxmetric_t *) zlistx_next (tx);
+                network_usage_metric = static_cast<linuxmetric_t *>(zlistx_next (tx));
             }
             zlistx_destroy (&tx);
 

@@ -99,21 +99,21 @@ struct _ftyinfo_t {
 
 //  @interface
 //  Create a new ftyinfo
-FTY_INFO_PRIVATE ftyinfo_t *
+ftyinfo_t *
     ftyinfo_new (topologyresolver_t *resolver, const char * path);
 
-FTY_INFO_PRIVATE ftyinfo_t *
+ftyinfo_t *
     ftyinfo_test_new (void);
 
 //  Destroy the ftyinfo
-FTY_INFO_PRIVATE void
+void
     ftyinfo_destroy (ftyinfo_t **self_p);
 
 // getters
-FTY_INFO_PRIVATE const char *
+const char *
     ftyinfo_uuid (ftyinfo_t *self);
 
-FTY_INFO_PRIVATE zhash_t *
+zhash_t *
     ftyinfo_infohash (ftyinfo_t *self);
 
 //  @end
