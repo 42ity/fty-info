@@ -19,61 +19,43 @@
     =========================================================================
 */
 
-#ifndef LINUXMETRIC_H_INCLUDED
-#define LINUXMETRIC_H_INCLUDED
+#pragma once
+#include <czmq.h>
+#include <string>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#define LINUXMETRIC_UPTIME "uptime"
-#define LINUXMETRIC_CPU_USAGE "usage.cpu"
+#define LINUXMETRIC_UPTIME          "uptime"
+#define LINUXMETRIC_CPU_USAGE       "usage.cpu"
 #define LINUXMETRIC_CPU_TEMPERATURE "temperature.cpu"
-#define LINUXMETRIC_MEMORY_TOTAL "total.memory"
-#define LINUXMETRIC_MEMORY_USED "used.memory"
-#define LINUXMETRIC_MEMORY_USAGE "usage.memory"
-#define LINUXMETRIC_DATA0_TOTAL "total.data.0"
-#define LINUXMETRIC_DATA0_USED "used.data.0"
-#define LINUXMETRIC_DATA0_USAGE "usage.data.0"
-#define LINUXMETRIC_SYSTEM_TOTAL "total.system"
-#define LINUXMETRIC_SYSTEM_USED  "used.system"
-#define LINUXMETRIC_SYSTEM_USAGE "usage.system"
+#define LINUXMETRIC_MEMORY_TOTAL    "total.memory"
+#define LINUXMETRIC_MEMORY_USED     "used.memory"
+#define LINUXMETRIC_MEMORY_USAGE    "usage.memory"
+#define LINUXMETRIC_DATA0_TOTAL     "total.data.0"
+#define LINUXMETRIC_DATA0_USED      "used.data.0"
+#define LINUXMETRIC_DATA0_USAGE     "usage.data.0"
+#define LINUXMETRIC_SYSTEM_TOTAL    "total.system"
+#define LINUXMETRIC_SYSTEM_USED     "used.system"
+#define LINUXMETRIC_SYSTEM_USAGE    "usage.system"
 
-#define BANDWIDTH_TEMPLATE "%s_bandwidth.%s"
-#define BYTES_TEMPLATE "%s_bytes.%s"
+#define BANDWIDTH_TEMPLATE   "%s_bandwidth.%s"
+#define BYTES_TEMPLATE       "%s_bytes.%s"
 #define ERROR_RATIO_TEMPLATE "%s_error_ratio.%s"
 
-struct _linuxmetric_t {
-    char *type;
-    double value;
-    const char *unit;
+struct _linuxmetric_t
+{
+    char*       type;
+    double      value;
+    const char* unit;
 };
 
 typedef struct _linuxmetric_t linuxmetric_t;
 
-//  @interface
 //  Create a new linuxmetric
-linuxmetric_t *
-    linuxmetric_new (void);
+linuxmetric_t* linuxmetric_new(void);
 
 //  Destroy the linuxmetric
-void
-    linuxmetric_destroy (linuxmetric_t **self_p);
+void linuxmetric_destroy(linuxmetric_t** self_p);
 
 // Create zlistx containing all Linux system info
-zlistx_t *
-    linuxmetric_get_all
-    (int interval,
-     zhashx_t *history,
-     std::string &root_dir,
-     bool metrics_test);
+zlistx_t* linuxmetric_get_all(int interval, zhashx_t* history, const std::string& root_dir, bool metrics_test);
 
-zhashx_t *
-    linuxmetric_list_interfaces (std::string &root_dir);
-//  @end
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif
+zhashx_t* linuxmetric_list_interfaces(const std::string& root_dir);

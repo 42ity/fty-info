@@ -19,34 +19,16 @@
     =========================================================================
 */
 
-#ifndef FTY_INFO_RC0_RUNONCE_H_INCLUDED
-#define FTY_INFO_RC0_RUNONCE_H_INCLUDED
+#pragma once
+#include <czmq.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+typedef struct _fty_info_rc0_runonce_t fty_info_rc0_runonce_t;
 
-//  @interface
 //  Create a new fty_info_rc0_runonce
-fty_info_rc0_runonce_t *
-    fty_info_rc0_runonce_new (char *name);
+fty_info_rc0_runonce_t* fty_info_rc0_runonce_new(char* name);
 
 //  Destroy the fty_info_rc0_runonce
-void
-    fty_info_rc0_runonce_destroy (fty_info_rc0_runonce_t **self_p);
+void fty_info_rc0_runonce_destroy(fty_info_rc0_runonce_t** self_p);
 
 //  Run once agent to update rackcontroller-0 first time it is created
-void
-    fty_info_rc0_runonce (zsock_t *pipe, void *args);
-
-//  Self test of this class
-void
-    fty_info_rc0_runonce_test (bool verbose);
-
-//  @end
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif
+void fty_info_rc0_runonce(zsock_t* pipe, void* args);

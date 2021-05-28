@@ -26,99 +26,100 @@
 @end
 */
 
-#include "fty_info_classes.h"
+#include "fty_info.h"
+#include <fty_log.h>
+#include <fty_proto.h>
+#include "fty_info_server.h"
+#include "fty_info_rc0_runonce.h"
 
-#define RC0_RUNONCE_ACTOR "fty-info-rc0-runonce"
+#define RC0_RUNONCE_ACTOR  "fty-info-rc0-runonce"
 #define DEFAULT_LOG_CONFIG "/etc/fty/ftylog.cfg"
 
-static int
-s_linuxmetrics_event (zloop_t *loop, int timer_id, void *output)
+static int s_linuxmetrics_event(zloop_t* /*loop*/, int /*timer_id*/, void* output)
 {
-    zstr_send (output, "LINUXMETRICS");
+    zstr_send(output, "LINUXMETRICS");
     return 0;
 }
 
-void
-usage(){
-    puts   ("fty-info [options] ...");
-    puts   ("  -v|--verbose        verbose test output");
-    puts   ("  -h|--help           this information");
-    puts   ("  -c|--config         path to config file\n");
-    puts   ("  -e|--endpoint       malamute endpoint [ipc://@/malamute]");
-
+void usage()
+{
+    puts("fty-info [options] ...");
+    puts("  -v|--verbose        verbose test output");
+    puts("  -h|--help           this information");
+    puts("  -c|--config         path to config file\n");
+    puts("  -e|--endpoint       malamute endpoint [ipc://@/malamute]");
 }
 
-int main (int argc, char *argv [])
+int main(int argc, char* argv[])
 {
-    int linuxmetrics_interval = DEFAULT_LINUXMETRICS_INTERVAL_SEC;
-    char *str_linuxmetrics_interval = NULL;
-    char *config_file = NULL;
-    zconfig_t *config = NULL;
-    char* actor_name = NULL;
-    char* endpoint = NULL;
-    char* path = NULL;
-    bool verbose = false;
-    int argn;
-    const char *hw_cap_path = "/usr/share/fty";
+    int         linuxmetrics_interval     = DEFAULT_LINUXMETRICS_INTERVAL_SEC;
+    char*       str_linuxmetrics_interval = NULL;
+    char*       config_file               = NULL;
+    zconfig_t*  config                    = NULL;
+    char*       actor_name                = NULL;
+    char*       endpoint                  = NULL;
+    char*       path                      = NULL;
+    bool        verbose                   = false;
+    int         argn;
+    const char* hw_cap_path = "/usr/share/fty";
 
-    ManageFtyLog::setInstanceFtylog (FTY_INFO_AGENT);
+    ManageFtyLog::setInstanceFtylog(FTY_INFO_AGENT);
     std::string log_config_path;
 
     // Parse command line
     for (argn = 1; argn < argc; argn++) {
-        char *param = NULL;
-        if (argn < argc - 1) param = argv [argn+1];
+        char* param = NULL;
+        if (argn < argc - 1)
+            param = argv[argn + 1];
 
-        if (streq (argv [argn], "--help")
-        ||  streq (argv [argn], "-h")) {
+        if (streq(argv[argn], "--help") || streq(argv[argn], "-h")) {
             usage();
             return 0;
-        }
-        else if (streq (argv [argn], "--verbose") ||  streq (argv [argn], "-v")) {
+        } else if (streq(argv[argn], "--verbose") || streq(argv[argn], "-v")) {
             verbose = true;
-        }
-        else if (streq (argv [argn], "--config") || streq (argv [argn], "-c")) {
-            if (param) config_file = param;
+        } else if (streq(argv[argn], "--config") || streq(argv[argn], "-c")) {
+            if (param)
+                config_file = param;
             ++argn;
-        }
-        else if (streq (argv [argn], "--endpoint") || streq (argv [argn], "-e")) {
-            if (param) endpoint = strdup(param);
+        } else if (streq(argv[argn], "--endpoint") || streq(argv[argn], "-e")) {
+            if (param)
+                endpoint = strdup(param);
             ++argn;
-        }
-        else {
+        } else {
             // FIXME: as per the systemd service file, the config file
             // is provided as the default arg without '-c'!
             // So, should we consider this?
-            printf ("Unknown option: %s\n", argv [argn]);
+            printf("Unknown option: %s\n", argv[argn]);
             return 1;
         }
     }
 
     // Parse config file
-    if(config_file) {
-        log_debug ("fty_info: loading configuration file '%s'", config_file);
-        config = zconfig_load (config_file);
+    if (config_file) {
+        log_debug("fty_info: loading configuration file '%s'", config_file);
+        config = zconfig_load(config_file);
         if (!config) {
-            log_error ("Failed to load config file %s: %m", config_file);
-            exit (EXIT_FAILURE);
+            log_error("Failed to load config file %s: %m", config_file);
+            exit(EXIT_FAILURE);
         }
         // VERBOSE
-        if (streq (zconfig_get (config, "server/verbose", "false"), "true")) {
+        if (streq(zconfig_get(config, "server/verbose", "false"), "true")) {
             verbose = true;
         }
 
         // Linux metrics publishing interval (in seconds)
-        str_linuxmetrics_interval = strdup(s_get (config, "server/check_interval", "30"));
+        str_linuxmetrics_interval = strdup(s_get(config, "server/check_interval", "30"));
         if (str_linuxmetrics_interval) {
-            linuxmetrics_interval = atoi (str_linuxmetrics_interval);
+            linuxmetrics_interval = atoi(str_linuxmetrics_interval);
         }
 
-        if (endpoint) zstr_free(&endpoint);
-        endpoint = strdup(s_get (config, "malamute/endpoint", NULL));
-        actor_name = strdup(s_get (config, "malamute/address", NULL));
-        path = strdup(s_get (config, "parameters/path", NULL));
+        if (endpoint)
+            zstr_free(&endpoint);
+        endpoint   = strdup(s_get(config, "malamute/endpoint", NULL));
+        actor_name = strdup(s_get(config, "malamute/address", NULL));
+        path       = strdup(s_get(config, "parameters/path", NULL));
 
-        log_config_path = std::string (s_get (config, "log/config", DEFAULT_LOG_CONFIG));
+        log_config_path = std::string(s_get(config, "log/config", DEFAULT_LOG_CONFIG));
     }
 
     ManageFtyLog::getInstanceFtylog()->setConfigFile(log_config_path);
@@ -136,35 +137,35 @@ int main (int argc, char *argv [])
     if (str_linuxmetrics_interval == NULL)
         str_linuxmetrics_interval = strdup(STR_DEFAULT_LINUXMETRICS_INTERVAL_SEC);
 
-    zactor_t *server = zactor_new (fty_info_server, (void*) actor_name);
+    zactor_t* server = zactor_new(fty_info_server, actor_name);
 
     //  Insert main code here
-    zstr_sendx (server, "PATH", path, NULL);
-    zstr_sendx (server, "CONFIG", hw_cap_path, NULL);
-    zstr_sendx (server, "CONNECT", endpoint, actor_name, NULL);
-    zstr_sendx (server, "CONSUMER", FTY_PROTO_STREAM_ASSETS, ".*", NULL);
-    zstr_sendx (server, "PRODUCER", "ANNOUNCE", NULL);
-    zstr_sendx (server, "ROOT_DIR", "/", NULL);
-    zstr_sendx (server, "LINUXMETRICSINTERVAL", str_linuxmetrics_interval, NULL);
+    zstr_sendx(server, "PATH", path, NULL);
+    zstr_sendx(server, "CONFIG", hw_cap_path, NULL);
+    zstr_sendx(server, "CONNECT", endpoint, actor_name, NULL);
+    zstr_sendx(server, "CONSUMER", FTY_PROTO_STREAM_ASSETS, ".*", NULL);
+    zstr_sendx(server, "PRODUCER", "ANNOUNCE", NULL);
+    zstr_sendx(server, "ROOT_DIR", "/", NULL);
+    zstr_sendx(server, "LINUXMETRICSINTERVAL", str_linuxmetrics_interval, NULL);
 
     // Run once actor to fill data about rackcontroller-0
-    zactor_t *rc0_runonce = zactor_new (fty_info_rc0_runonce, (void *) RC0_RUNONCE_ACTOR);
-    zstr_sendx (rc0_runonce, "CONNECT", endpoint, actor_name, NULL);
-    zstr_sendx (rc0_runonce, "CONSUMER", FTY_PROTO_STREAM_ASSETS, "device\\.rackcontroller.*", NULL);
+    zactor_t* rc0_runonce = zactor_new(fty_info_rc0_runonce, const_cast<char*>(RC0_RUNONCE_ACTOR));
+    zstr_sendx(rc0_runonce, "CONNECT", endpoint, actor_name, NULL);
+    zstr_sendx(rc0_runonce, "CONSUMER", FTY_PROTO_STREAM_ASSETS, "device\\.rackcontroller.*", NULL);
 
-    zloop_t *timer_loop = zloop_new();
-    zloop_timer (timer_loop, linuxmetrics_interval * 1000, 0, s_linuxmetrics_event, server);
-    zloop_start (timer_loop);
+    zloop_t* timer_loop = zloop_new();
+    zloop_timer(timer_loop, size_t(linuxmetrics_interval * 1000), 0, s_linuxmetrics_event, server);
+    zloop_start(timer_loop);
 
     // Cleanup
-    zloop_destroy (&timer_loop);
-    zactor_destroy (&server);
-    zactor_destroy (&rc0_runonce);
-    zstr_free (&actor_name);
-    zstr_free (&endpoint);
-    zstr_free (&path);
-    zstr_free (&str_linuxmetrics_interval);
-    zconfig_destroy (&config);
+    zloop_destroy(&timer_loop);
+    zactor_destroy(&server);
+    zactor_destroy(&rc0_runonce);
+    zstr_free(&actor_name);
+    zstr_free(&endpoint);
+    zstr_free(&path);
+    zstr_free(&str_linuxmetrics_interval);
+    zconfig_destroy(&config);
 
     return 0;
 }

@@ -19,72 +19,44 @@
     =========================================================================
 */
 
-#ifndef TOPOLOGYRESOLVER_H_INCLUDED
-#define TOPOLOGYRESOLVER_H_INCLUDED
+#pragma once
+#include <fty_proto.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+typedef struct _topologyresolver_t topologyresolver_t;
 
-//  @interface
 //  Create a new topologyresolver
-topologyresolver_t *
-    topologyresolver_new (const char *iname);
+topologyresolver_t* topologyresolver_new(const char* iname);
 
 //  Destroy the topologyresolver
-void
-    topologyresolver_destroy (topologyresolver_t **self_p);
+void topologyresolver_destroy(topologyresolver_t** self_p);
 
 //  Set endpoint for Malamute client
-void
-    topologyresolver_set_endpoint (topologyresolver_t *self, const char *endpoint);
+void topologyresolver_set_endpoint(topologyresolver_t* self, const char* endpoint);
 
 //  get RC internal name
-char *
-    topologyresolver_id (topologyresolver_t *self);
+char* topologyresolver_id(topologyresolver_t* self);
 
 // Return URI of asset for this topologyresolver
-char *
-    topologyresolver_to_rc_name_uri (topologyresolver_t *self);
+char* topologyresolver_to_rc_name_uri(topologyresolver_t* self);
 
 //  Give topology resolver one asset information
-bool
-    topologyresolver_asset (topologyresolver_t *self, fty_proto_t *message);
+bool topologyresolver_asset(topologyresolver_t* self, fty_proto_t* message);
 
 //  Return URI of the asset's parent
-char *
-    topologyresolver_to_parent_uri (topologyresolver_t *self);
+char* topologyresolver_to_parent_uri(topologyresolver_t* self);
 
 //  Return user-friendly name of the asset
-char *
-    topologyresolver_to_rc_name (topologyresolver_t *self);
+char* topologyresolver_to_rc_name(topologyresolver_t* self);
 
 //  Return description of the asset
-char *
-    topologyresolver_to_description (topologyresolver_t *self);
+char* topologyresolver_to_description(topologyresolver_t* self);
 
 //  Return contact of the asset
-char *
-    topologyresolver_to_contact (topologyresolver_t *self);
+char* topologyresolver_to_contact(topologyresolver_t* self);
 
 //  Return topology as string of friedly names (or NULL if incomplete)
-char *
-    topologyresolver_to_string (topologyresolver_t *self, const char *separator = "/");
+char* topologyresolver_to_string(topologyresolver_t* self, const char* separator = "/");
 
 //  Return zlist of inames starting with asset up to DC
 //  Empty list is returned if the topology is incomplete yet
-zlistx_t *
-    topologyresolver_to_list (topologyresolver_t *self);
-
-// Selftest for this class
-void
-    topologyresolver_test (bool verbose);
-
-
-//  @end
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif
+zlistx_t* topologyresolver_to_list(topologyresolver_t* self);
