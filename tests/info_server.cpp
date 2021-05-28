@@ -618,7 +618,7 @@ TEST_CASE("info server test")
     }
     {
         // TEST #8: hw capability info
-        zstr_sendx(info_server, "CONFIG", "./selftest-ro/data/hw_cap", NULL);
+        zstr_sendx(info_server, "CONFIG", "tests/selftest-ro/data/hw_cap", NULL);
 
         zmsg_t* hw_req = zmsg_new();
         zmsg_addstr(hw_req, "HW_CAP");
