@@ -31,6 +31,7 @@
 #include "ftyinfo.h"
 #include "topologyresolver.h"
 #include <fty_log.h>
+#include <fty_proto.h>
 #include <malamute.h>
 
 //  Structure of our class
@@ -90,7 +91,7 @@ int handle_stream(fty_info_rc0_runonce_t* self, zmsg_t* msg)
     if (NULL == self || NULL == msg) {
         return -1;
     }
-    if (!is_fty_proto(msg)) {
+    if (!fty_proto_is(msg)) {
         zmsg_destroy(&msg);
         return 0;
     }

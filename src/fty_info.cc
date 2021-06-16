@@ -19,12 +19,7 @@
     =========================================================================
 */
 
-/*
-@header
-    fty_info - Agent which returns rack controller information
-@discuss
-@end
-*/
+/// fty_info - Agent which returns rack controller information
 
 #include "fty_info.h"
 #include <fty_log.h>

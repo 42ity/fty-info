@@ -59,3 +59,11 @@ void linuxmetric_destroy(linuxmetric_t** self_p);
 zlistx_t* linuxmetric_get_all(int interval, zhashx_t* history, const std::string& root_dir, bool metrics_test);
 
 zhashx_t* linuxmetric_list_interfaces(const std::string& root_dir);
+
+struct Metric
+{
+    std::string type;
+    std::string unit;
+    double      value;
+};
+

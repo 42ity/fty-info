@@ -455,7 +455,7 @@ out:
 //  process message from FTY_PROTO_ASSET stream
 void static s_handle_stream(fty_info_server_t* self, zmsg_t* message)
 {
-    if (!is_fty_proto(message)) {
+    if (!fty_proto_is(message)) {
         zmsg_destroy(&message);
         return;
     }
