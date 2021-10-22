@@ -450,7 +450,12 @@ zhashx_t* linuxmetric_list_interfaces(const std::string& root_dir)
     std::filesystem::path dir(root_dir + "sys/class/net/");
 
     for (const auto & entry : std::filesystem::directory_iterator(dir)) {
-        std::string iface = std::filesystem::relative(entry.path(), dir);
+        std::string iface = entry.path();
+        auto pos = iface.find_last_of("/");
+        if (pos != std::string::npos) {
+            iface = iface.substr(pos + 1);
+        }
+
         // we are not interested in loopback
         if (iface != "lo") {
             if (is_interface_online(iface.c_str(), root_dir))
