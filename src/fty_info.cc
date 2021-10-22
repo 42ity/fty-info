@@ -58,8 +58,7 @@ int main(int argc, char* argv[])
     int         argn;
     const char* hw_cap_path = "/usr/share/fty";
 
-    ManageFtyLog::setInstanceFtylog(FTY_INFO_AGENT);
-    std::string log_config_path;
+    ManageFtyLog::setInstanceFtylog(FTY_INFO_AGENT, FTY_COMMON_LOGGING_DEFAULT_CFG);
 
     // Parse command line
     for (argn = 1; argn < argc; argn++) {
@@ -114,13 +113,12 @@ int main(int argc, char* argv[])
         actor_name = strdup(s_get(config, "malamute/address", NULL));
         path       = strdup(s_get(config, "parameters/path", NULL));
 
-        log_config_path = std::string(s_get(config, "log/config", DEFAULT_LOG_CONFIG));
+        // ignore "log/config"
     }
 
-    ManageFtyLog::getInstanceFtylog()->setConfigFile(log_config_path);
-
-    if (verbose)
-        ManageFtyLog::getInstanceFtylog()->setVeboseMode();
+    if (verbose) {
+        ManageFtyLog::getInstanceFtylog()->setVerboseMode();
+    }
 
     // Sanity checks
     if (actor_name == NULL)
