@@ -195,7 +195,7 @@ ftyinfo_t* ftyinfo_new(topologyresolver_t* resolver, const char* path)
 
     // set uuid, vendor, product, part_number, verson from /etc/release-details.json
     cxxtools::SerializationInfo* si = s_load_release_details();
-    if (si != nullptr) {
+    if (si) {
         self->uuid         = s_get_release_details(*si, "uuid", NULL);
         self->vendor       = s_get_release_details(*si, "hardware-vendor", NULL); // Eaton or OEMs
         self->manufacturer = strdup("EATON");                                     // Eaton only
@@ -207,7 +207,7 @@ ftyinfo_t* ftyinfo_new(topologyresolver_t* resolver, const char* path)
         log_info("fty-info:vendor       = '%s'", self->vendor);
         log_info("fty-info:manufacturer = '%s'", self->manufacturer);
         log_info("fty-info:serial       = '%s'", self->serial);
-        log_info("fty-info:product        = '%s'", self->product);
+        log_info("fty-info:product      = '%s'", self->product);
         log_info("fty-info:part_number  = '%s'", self->part_number);
         log_info("fty-info:version      = '%s'", self->version);
     }
@@ -236,19 +236,21 @@ ftyinfo_t* ftyinfo_new(topologyresolver_t* resolver, const char* path)
     // use default
     self->path            = strdup(path);
     self->protocol_format = strdup(TXT_PROTO_FORMAT);
+
     // update type (ipm-va by default)
     std::string s_type = TXT_IPM_VA_TYPE;
     if (self->product) {
-        if (strcmp(self->product, "IPC3000") == 0) {
+        if (streq(self->product, "IPC3000")) {
             s_type = TXT_IPC_TYPE;
-        } else if (strcmp(self->product, "IPM Editions VA") == 0) {
+        } else if (streq(self->product, "IPM Editions VA")) {
             s_type = TXT_IPM_VA_TYPE;
-        } else if ((strcmp(self->product, "IPM Infra VA") == 0) || (strcmp(self->product, "IPC3000E-LXC") == 0)) {
+        } else if (streq(self->product, "IPM Infra VA") || streq(self->product, "IPC3000E-LXC")) {
             s_type = TXT_IPC_VA_TYPE;
         }
     }
     self->type    = strdup(s_type.c_str());
     self->txtvers = strdup(TXT_VER);
+
     log_info("fty-info:path = '%s'", self->path);
     log_info("fty-info:protocol_format = '%s'", self->protocol_format);
     log_info("fty-info:type = '%s'", self->type);
@@ -267,8 +269,10 @@ ftyinfo_t* ftyinfo_new(topologyresolver_t* resolver, const char* path)
             if (iface->ifa_addr == NULL)
                 continue;
             // here we support IPv4 only, only get first 3 addresses
-            if (iface->ifa_addr->sa_family == AF_INET && 0 == getnameinfo(iface->ifa_addr, sizeof(struct sockaddr_in),
-                                                                  host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST)) {
+            if (iface->ifa_addr->sa_family == AF_INET
+                && 0 == getnameinfo(iface->ifa_addr, sizeof(struct sockaddr_in),
+                        host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST)
+            ) {
                 self->ip[counter] = strdup(host);
                 ++counter;
             }
@@ -281,7 +285,6 @@ ftyinfo_t* ftyinfo_new(topologyresolver_t* resolver, const char* path)
 
     if (si)
         delete si;
-
     if (bi)
         delete bi;
 

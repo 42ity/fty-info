@@ -79,7 +79,10 @@ const char* s_get(zconfig_t* config, const char* key, const char* dfl)
 //  Free wrapper for zhashx destructor
 static void history_destructor(void** item)
 {
-    free(*item);
+    if (item && (*item)) {
+        free(*item);
+        *item = nullptr;
+    }
 }
 
 //  --------------------------------------------------------------------------
@@ -87,10 +90,9 @@ static void history_destructor(void** item)
 
 fty_info_server_t* info_server_new(char* name)
 {
-    double*            numerator_ptr   = reinterpret_cast<double*>(zmalloc(sizeof(double)));
-    double*            denominator_ptr = reinterpret_cast<double*>(zmalloc(sizeof(double)));
-    fty_info_server_t* self            = new fty_info_server_t;
+    fty_info_server_t* self = new fty_info_server_t; //root_dir is a std::string!!!
     assert(self);
+
     //  Initialize class properties here
     self->name            = strdup(name);
     self->client          = mlm_client_new();
@@ -100,11 +102,16 @@ fty_info_server_t* info_server_new(char* name)
     self->history         = zhashx_new();
     self->hw_cap_path     = NULL;
     self->resolver        = topologyresolver_new(DEFAULT_RC_INAME);
+
+    double* numerator_ptr   = reinterpret_cast<double*>(zmalloc(sizeof(double)));
+    double* denominator_ptr = reinterpret_cast<double*>(zmalloc(sizeof(double)));
     zhashx_set_destructor(self->history, history_destructor);
     zhashx_insert(self->history, HIST_CPU_NUMERATOR, numerator_ptr);
     zhashx_insert(self->history, HIST_CPU_DENOMINATOR, denominator_ptr);
+
     return self;
 }
+
 //  --------------------------------------------------------------------------
 //  Destroy the fty_info_server
 
@@ -128,33 +135,27 @@ void info_server_destroy(fty_info_server_t** self_p)
     }
 }
 
-
 // return NAME (uuid first 8 digits)
-// the returned buffer should be freed
+// the returned buffer must be freed by caller
 static char* s_get_name(ftyinfo_t* info)
 {
     std::string s_name = SRV_IPC_NAME;
-    if (info && info->type && info->product && (strcmp(info->type, TXT_IPC_TYPE) != 0) &&
-        (strcmp(info->type, TXT_IPC_VA_TYPE) != 0)) {
+    if (info && info->type && info->product
+        && (strcmp(info->type, TXT_IPC_TYPE) != 0)
+        && (strcmp(info->type, TXT_IPC_VA_TYPE) != 0))
+    {
         s_name = info->product;
     }
-    char*       buffer = static_cast<char*>(malloc(s_name.length() + 12));
-    char        first_digit[9];
+
+    char first_digit[9];
     const char* uuid = ftyinfo_uuid(info);
-#if __GNUC__ >= 8
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wstringop-truncation"
-#endif
-    if (uuid) {
-        strncpy(first_digit, uuid, 8);
-    } else {
-        strncpy(first_digit, DEFAULT_UUID, 8);
-    }
-#if __GNUC__ >= 8
-#pragma GCC diagnostic pop
-#endif
+    strncpy(first_digit, (uuid ? uuid : DEFAULT_UUID), 8);
     first_digit[8] = '\0';
-    sprintf(buffer, "%s (%s)", s_name.c_str(), first_digit);
+
+	size_t buffer_size = s_name.length() + 12;
+    char* buffer = static_cast<char*>(malloc(buffer_size));
+    snprintf(buffer, buffer_size, "%s (%s)", s_name.c_str(), first_digit);
+
     return buffer;
 }
 
@@ -183,14 +184,11 @@ static char* s_get_name(ftyinfo_t* info)
 //          txtvers
 static zmsg_t* s_create_info(ftyinfo_t* info)
 {
+    char* srv_name = s_get_name(info);
+
     zmsg_t* msg = zmsg_new();
     zmsg_addstr(msg, FTY_INFO_CMD);
-    char* srv_name = s_get_name(info);
-    if (srv_name) {
-        zmsg_addstr(msg, srv_name);
-    } else {
-        zmsg_addstr(msg, DEFAULT_UUID);
-    }
+    zmsg_addstr(msg, srv_name ? srv_name : DEFAULT_UUID);
     zmsg_addstr(msg, SRV_TYPE);
     zmsg_addstr(msg, SRV_STYPE);
     zmsg_addstr(msg, SRV_PORT);
@@ -209,10 +207,10 @@ static zmsg_t* s_create_info(ftyinfo_t* info)
 //  subject : CREATE/UPDATE
 static void s_publish_announce(fty_info_server_t* self)
 {
-
     if (!mlm_client_connected(self->announce_client))
         return;
-    ftyinfo_t* info;
+
+    ftyinfo_t* info = nullptr;
     if (!self->test) {
         info = ftyinfo_new(self->resolver, self->path);
     } else
@@ -232,6 +230,7 @@ static void s_publish_announce(fty_info_server_t* self)
         else
             log_error("cant publish UPDATE msg on ANNOUNCE STREAM");
     }
+    zmsg_destroy(&msg);
     ftyinfo_destroy(&info);
 }
 
@@ -311,6 +310,7 @@ bool static s_handle_pipe(fty_info_server_t* self, zmsg_t* message)
         char* path = zmsg_popstr(message);
 
         if (path) {
+            zstr_free(&self->path);
             self->path = strdup(path);
             log_debug("fty-info: PATH: %s", self->path);
         }
@@ -333,8 +333,8 @@ bool static s_handle_pipe(fty_info_server_t* self, zmsg_t* message)
                 zmsg_destroy(&republish);
                 if (rv == 0) {
                     // consume response
-                    republish = mlm_client_recv(self->client);
-                    zmsg_destroy(&republish);
+                    zmsg_t* msg = mlm_client_recv(self->client);
+                    zmsg_destroy(&msg);
                 } else {
                     log_error("%s: cannot send REPUBLISH message", self->name);
                 }
@@ -345,8 +345,7 @@ bool static s_handle_pipe(fty_info_server_t* self, zmsg_t* message)
             rv = mlm_client_set_producer(self->announce_client, stream);
             if (rv == -1)
                 log_error("%s: can't set producer on stream '%s'", self->name, stream);
-            else
-                // do the first announce
+            else // do the first announce
                 s_publish_announce(self);
         } else if (streq(stream, "METRICS-TEST")) {
             // publish the first metrics
@@ -375,11 +374,13 @@ bool static s_handle_pipe(fty_info_server_t* self, zmsg_t* message)
     } else if (streq(command, "LINUXMETRICS")) {
         s_publish_linuxmetrics(self);
     } else if (streq(command, "CONFIG")) {
+        zstr_free(&self->hw_cap_path);
         self->hw_cap_path = zmsg_popstr(message);
         if (!self->hw_cap_path)
             log_error("%s: hw_cap_path missing", command);
-    } else
+    } else {
         log_error("fty-info: Unknown actor command: %s.\n", command);
+    }
 
     zstr_free(&command);
     zmsg_destroy(&message);

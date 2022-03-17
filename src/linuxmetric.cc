@@ -433,8 +433,7 @@ linuxmetric_t* linuxmetric_new(void)
 
 void linuxmetric_destroy(linuxmetric_t** self_p)
 {
-    assert(self_p);
-    if (*self_p) {
+    if (self_p && (*self_p)) {
         linuxmetric_t* self = *self_p;
         //  Free class properties here
         zstr_free(&self->type);
@@ -458,10 +457,8 @@ zhashx_t* linuxmetric_list_interfaces(const std::string& root_dir)
 
         // we are not interested in loopback
         if (iface != "lo") {
-            if (is_interface_online(iface.c_str(), root_dir))
-                zhashx_update(interfaces, iface.c_str(), const_cast<char*>("up"));
-            else
-                zhashx_update(interfaces, iface.c_str(), const_cast<char*>("down"));
+            bool isUp = is_interface_online(iface.c_str(), root_dir);
+            zhashx_update(interfaces, iface.c_str(), const_cast<char*>(isUp ? "up" : "down"));
         }
     }
 
@@ -477,10 +474,12 @@ zlistx_t* linuxmetric_get_all(int interval, zhashx_t* history, const std::string
 
     linuxmetric_t* uptime = s_uptime(root_dir);
     zlistx_add_end(info, uptime);
+
     linuxmetric_t* cpu_usage = s_cpu_usage(root_dir, history);
     zlistx_add_end(info, cpu_usage);
+
     linuxmetric_t* cpu_temperature = s_cpu_temperature(root_dir);
-    if (cpu_temperature != NULL)
+    if (cpu_temperature)
         zlistx_add_end(info, cpu_temperature);
 
     zlistx_t*      meminfo    = s_meminfo(root_dir);
@@ -507,7 +506,8 @@ zlistx_t* linuxmetric_get_all(int interval, zhashx_t* history, const std::string
             flash_metric = static_cast<linuxmetric_t*>(zlistx_next(flash_info));
         }
         zlistx_destroy(&flash_info);
-    } else {
+    }
+    else { // tests
         linuxmetric_t* sdcard_total_info = linuxmetric_new();
         sdcard_total_info->type          = strdup(LINUXMETRIC_DATA0_TOTAL);
         sdcard_total_info->value         = 10;
