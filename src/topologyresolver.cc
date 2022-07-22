@@ -431,62 +431,83 @@ zlistx_t* topologyresolver_to_list(topologyresolver_t* self)
     zlistx_set_duplicator(list, reinterpret_cast<void* (*)(const void*)>(strdup));
     zlistx_set_comparator(list, reinterpret_cast<int (*)(const void*, const void*)>(strcmp));
 
-    if (!self || !self->iname)
+    if (!self || !self->iname) {
         return list;
+    }
+
     fty_proto_t* msg = static_cast<fty_proto_t*>(zhashx_lookup(self->assets, self->iname));
-    if (!msg)
+    if (!msg) {
         return list;
+    }
 
     char buffer[16]; // strlen ("parent_name.123") + 1
 
-    bool abortAndPurge = false;
-    for (int i = 1; (i < 100) && !abortAndPurge; i++) {
-        snprintf(buffer, sizeof(buffer), "parent_name.%i", i);
+    for (int i = 1; i < 100; i++) {
+        snprintf(buffer, sizeof(buffer), "parent_name.%d", i);
         const char* parent = fty_proto_aux_string(msg, buffer, nullptr);
-        if (!parent)
+        if (!parent) {
             break;
+        }
+
+        bool purgeAndBreak = false;
 
         if (!zhashx_lookup(self->assets, parent)) {
-            // ask ASSET_AGENT for ASSET_DETAIL
             if (mlm_client_connected(self->client)) {
-                log_debug("ask ASSET AGENT for ASSET_DETAIL, RC = %s, iname = %s", self->iname, parent);
-
+                // ask ASSET_AGENT for ASSET_DETAIL
                 zuuid_t* uuid = zuuid_new();
-                int r = mlm_client_sendtox(
-                    self->client, FTY_ASSET_AGENT, "ASSET_DETAIL", "GET", zuuid_str_canonical(uuid), parent, nullptr);
-                zmsg_t* parent_msg = (r == 0) ? mlm_client_recv(self->client) : nullptr;
-                if (parent_msg) {
-                    char* rcv_uuid = zmsg_popstr(parent_msg);
-                    if (rcv_uuid && streq(rcv_uuid, zuuid_str_canonical(uuid)) && fty_proto_is(parent_msg)) {
-                        fty_proto_t* parent_fmsg = fty_proto_decode(&parent_msg);
+                const char* uuid_sent = zuuid_str_canonical(uuid);
+
+                log_debug("ask ASSET AGENT for ASSET_DETAIL, RC = %s, iname = %s", self->iname, parent);
+                zmsg_t* reply = NULL;
+                int r = mlm_client_sendtox(self->client, FTY_ASSET_AGENT, "ASSET_DETAIL", "GET", uuid_sent, parent, nullptr);
+                if (r != 0) {
+                    log_error("sendto %s ASSET_DETAIL failed (r : %d)", FTY_ASSET_AGENT, r);
+                }
+                else {
+                    zpoller_t* poller = zpoller_new(mlm_client_msgpipe(self->client), NULL);
+                    reply = (poller && zpoller_wait(poller, 5000)) ? mlm_client_recv(self->client) : NULL;
+                    zpoller_destroy(&poller);
+                    if (!reply) {
+                        log_error("reply %s ASSET_DETAIL is empty", FTY_ASSET_AGENT);
+                    }
+                }
+
+                if (reply) {
+                    char* uuid_recv = zmsg_popstr(reply);
+                    if (uuid_recv && streq(uuid_recv, uuid_sent) && fty_proto_is(reply)) {
+                        fty_proto_t* parent_fmsg = fty_proto_decode(&reply);
                         zhashx_update(self->assets, parent, parent_fmsg);
                         zlistx_add_start(list, const_cast<char*>(parent));
-                    } else {
-                        // invalid zuuid or unknown parent, topology is not complete
-                        abortAndPurge = true;
                     }
-                    zstr_free(&rcv_uuid);
+                    else {
+                        // invalid zuuid or unknown parent, topology is not complete
+                        log_error("reply %s ASSET_DETAIL invalid uuid", FTY_ASSET_AGENT);
+                        purgeAndBreak = true;
+                    }
+                    zstr_free(&uuid_recv);
                 }
                 else {
                     // parent is unknown, topology is not complete
-                    abortAndPurge = true;
+                    purgeAndBreak = true;
                 }
-                zmsg_destroy(&parent_msg);
+
+                zmsg_destroy(&reply);
                 zuuid_destroy(&uuid);
             }
             else {
                 // parent is unknown, topology is not complete
-                abortAndPurge = true;
+                purgeAndBreak = true;
             }
         }
         else {
             zlistx_add_start(list, const_cast<char*>(parent));
         }
+
+        if (purgeAndBreak) {
+            zlistx_purge(list);
+            break;
+        }
     }
 
-    if (abortAndPurge) {
-        zlistx_purge(list);
-    }
     return list;
 }
-
