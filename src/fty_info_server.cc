@@ -331,13 +331,10 @@ bool static s_handle_pipe(fty_info_server_t* self, zmsg_t* message)
                 zmsg_t* republish = zmsg_new();
                 int rv = mlm_client_sendto(self->client, FTY_ASSET_AGENT, "REPUBLISH", NULL, 5000, &republish);
                 zmsg_destroy(&republish);
-                if (rv == 0) {
-                    // consume response
-                    zmsg_t* msg = mlm_client_recv(self->client);
-                    zmsg_destroy(&msg);
-                } else {
+                if (rv != 0) {
                     log_error("%s: cannot send REPUBLISH message", self->name);
                 }
+                // no response expected
             }
             int rv = mlm_client_connect(self->announce_client, self->endpoint, 1000, "fty_info_announce");
             if (rv == -1)
