@@ -263,7 +263,7 @@ bool topologyresolver_asset(topologyresolver_t* self, fty_proto_t* message)
         // we received a message about ourselves, trigger recomputation
         zhashx_update(self->assets, iname, message);
         zlistx_t* list = topologyresolver_to_list(self);
-        if (!zlistx_size(list)) {
+        if (zlistx_size(list) == 0) {
             // Can't resolve topology any more
             self->state = DISCOVERING;
             zlistx_destroy(&list);
@@ -284,7 +284,6 @@ bool topologyresolver_asset(topologyresolver_t* self, fty_proto_t* message)
             zlistx_destroy(&list);
             return true;
         }
-
         zlistx_destroy(&list);
         return false;
     }
@@ -297,7 +296,7 @@ bool topologyresolver_asset(topologyresolver_t* self, fty_proto_t* message)
             zhashx_update(self->assets, iname, message);
             zlistx_t* list = topologyresolver_to_list(self);
             if (zlistx_size(list) == 0) {
-                // Can't resolv topology any more
+                // Can't resolve topology any more
                 self->state = DISCOVERING;
                 zlistx_destroy(&list);
                 return false;
@@ -392,13 +391,14 @@ char* topologyresolver_to_string(topologyresolver_t* self, const char* separator
 {
     zlistx_t* parents = topologyresolver_to_list(self);
 
-    if (!zlistx_size(parents)) {
+    if (zlistx_size(parents) == 0) {
         zlistx_destroy(&parents);
         return nullptr;
     }
 
     zstr_free(&self->topology);
     self->topology = strdup("");
+
     char* iname    = static_cast<char*>(zlistx_first(parents));
     while (iname) {
         fty_proto_t* msg = static_cast<fty_proto_t*>(zhashx_lookup(self->assets, iname));
@@ -411,13 +411,16 @@ char* topologyresolver_to_string(topologyresolver_t* self, const char* separator
             }
         }
         iname = static_cast<char*>(zlistx_next(parents));
-    };
+    }
+
     if (strlen(self->topology) >= strlen(separator)) {
         // remove trailing separator
         char* p = &self->topology[strlen(self->topology) - strlen(separator)];
         *p      = 0;
     }
+
     zlistx_destroy(&parents);
+
     return strdup(self->topology);
 }
 
@@ -457,18 +460,18 @@ zlistx_t* topologyresolver_to_list(topologyresolver_t* self)
                 zuuid_t* uuid = zuuid_new();
                 const char* uuid_sent = zuuid_str_canonical(uuid);
 
-                log_debug("ask ASSET AGENT for ASSET_DETAIL, RC = %s, iname = %s", self->iname, parent);
+                log_debug("ask %s for ASSET_DETAIL, RC = %s, iname = %s", FTY_ASSET_AGENT, self->iname, parent);
                 zmsg_t* reply = NULL;
                 int r = mlm_client_sendtox(self->client, FTY_ASSET_AGENT, "ASSET_DETAIL", "GET", uuid_sent, parent, nullptr);
                 if (r != 0) {
-                    log_error("sendto %s ASSET_DETAIL failed (r : %d)", FTY_ASSET_AGENT, r);
+                    log_error("sendto %s ASSET_DETAIL %s failed (r : %d)", FTY_ASSET_AGENT, parent, r);
                 }
                 else {
                     zpoller_t* poller = zpoller_new(mlm_client_msgpipe(self->client), NULL);
                     reply = (poller && zpoller_wait(poller, 5000)) ? mlm_client_recv(self->client) : NULL;
                     zpoller_destroy(&poller);
                     if (!reply) {
-                        log_error("reply %s ASSET_DETAIL is empty", FTY_ASSET_AGENT);
+                        log_error("reply %s ASSET_DETAIL %s is empty", FTY_ASSET_AGENT, parent);
                     }
                 }
 

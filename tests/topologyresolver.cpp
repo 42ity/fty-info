@@ -52,7 +52,6 @@ TEST_CASE("topologyresolver test")
     fty_proto_set_aux(msg2, &aux);
 
     fty_proto_t* msg3 = fty_proto_new(FTY_PROTO_ASSET);
-
     fty_proto_set_name(msg3, "parent");
     fty_proto_set_operation(msg3, FTY_PROTO_ASSET_OP_CREATE);
     ext = zhash_new();
@@ -103,7 +102,6 @@ TEST_CASE("topologyresolver test")
     free(res);
 
     fty_proto_t* msg5 = fty_proto_new(FTY_PROTO_ASSET);
-
     fty_proto_set_name(msg5, "newparent");
     fty_proto_set_operation(msg5, FTY_PROTO_ASSET_OP_CREATE);
     ext = zhash_new();

@@ -396,12 +396,19 @@ void fty_msg_free_fn(void* data)
 
 //  --------------------------------------------------------------------------
 // return zmsg_t with hw capability info or NULL if info cannot be retrieved
-static zmsg_t* s_hw_cap(fty_info_server_t* self, const char* type, char* zuuid)
+static zmsg_t* s_hw_cap(fty_info_server_t* self, const char* type, const char* zuuid)
 {
-    zmsg_t*    msg = zmsg_new();
-    char*      tmp = zsys_sprintf("%s/%s", self->hw_cap_path, HW_CAP_FILE);
-    zconfig_t* cap = zconfig_load(tmp);
-    zstr_free(&tmp);
+    if (!type) type = "(null)"; //secure
+    if (!zuuid) zuuid = "(null)";
+
+    zmsg_t* msg = zmsg_new();
+
+    zconfig_t* cap = NULL;
+    {
+        char* tmp = zsys_sprintf("%s/%s", self->hw_cap_path, HW_CAP_FILE);
+        cap = zconfig_load(tmp);
+        zstr_free(&tmp);
+    }
 
     if (!cap) {
         log_debug("s_hw_cap: cannot load capability file from %s", self->hw_cap_path);
@@ -417,35 +424,33 @@ static zmsg_t* s_hw_cap(fty_info_server_t* self, const char* type, char* zuuid)
         zmsg_addstr(msg, "OK");
         zmsg_addstr(msg, type);
         zmsg_addstr(msg, count);
-        if (streq(count, "0"))
-            goto out;
 
-        path           = zsys_sprintf("hardware/%s/base_address", type);
-        const char* ba = s_get(cap, path, "");
-        zstr_free(&path);
-        zmsg_addstr(msg, ba);
+        if (!streq(count, "0")) {
+            path           = zsys_sprintf("hardware/%s/base_address", type);
+            const char* ba = s_get(cap, path, "");
+            zstr_free(&path);
+            zmsg_addstr(msg, ba);
 
-        path               = zsys_sprintf("hardware/%s/offset", type);
-        const char* offset = s_get(cap, path, "");
-        zstr_free(&path);
-        zmsg_addstr(msg, offset);
+            path               = zsys_sprintf("hardware/%s/offset", type);
+            const char* offset = s_get(cap, path, "");
+            zstr_free(&path);
+            zmsg_addstr(msg, offset);
 
-        path           = zsys_sprintf("hardware/%s/mapping", type);
-        zconfig_t* ret = zconfig_locate(cap, path);
-        zstr_free(&path);
+            path           = zsys_sprintf("hardware/%s/mapping", type);
+            zconfig_t* ret = zconfig_locate(cap, path);
+            zstr_free(&path);
 
-        if (ret) {
-            ret = zconfig_child(ret);
-            while (ret != NULL) {
-                zmsg_addstr(msg, zconfig_name(ret));
-                zmsg_addstr(msg, zconfig_value(ret));
+            if (ret) {
+                ret = zconfig_child(ret);
+                while (ret != NULL) {
+                    zmsg_addstr(msg, zconfig_name(ret));
+                    zmsg_addstr(msg, zconfig_value(ret));
 
-                ret = zconfig_next(ret);
+                    ret = zconfig_next(ret);
+                }
+                zconfig_destroy(&ret); //always NULL here!?
             }
-            zconfig_destroy(&ret);
         }
-    } else if (streq(type, "serial")) {
-        // not implemented yet
     } else if (streq(type, "type")) {
         zmsg_addstr(msg, zuuid);
         zmsg_addstr(msg, "OK");
@@ -459,7 +464,6 @@ static zmsg_t* s_hw_cap(fty_info_server_t* self, const char* type, char* zuuid)
         zmsg_addstr(msg, "unsupported type");
     }
 
-out:
     zconfig_destroy(&cap);
     return msg;
 }
@@ -519,8 +523,7 @@ void static s_handle_mailbox(fty_info_server_t* self, zmsg_t* message)
         ftyinfo_destroy(&info);
     } else if (streq(command, "HW_CAP")) {
         char* type = zmsg_popstr(message);
-        if (type)
-            reply = s_hw_cap(self, type, zuuid);
+        reply = s_hw_cap(self, type, zuuid);
 
         if (zmsg_size(reply) == 0) {
             zmsg_pushstrf(reply, "%s", zuuid);
@@ -552,6 +555,7 @@ void static s_handle_mailbox(fty_info_server_t* self, zmsg_t* message)
     zstr_free(&zuuid);
     zstr_free(&command);
 }
+
 //  --------------------------------------------------------------------------
 //  Create a new fty_info_server
 
