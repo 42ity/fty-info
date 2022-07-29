@@ -437,9 +437,16 @@ zlistx_t* topologyresolver_to_list(topologyresolver_t* self)
             if (mlm_client_connected(self->client)) {
                 zuuid_t* uuid = zuuid_new();
                 log_debug("ask ASSET AGENT for ASSET_DETAIL, RC = %s, iname = %s", self->iname, parent);
-                mlm_client_sendtox(
+                int r = mlm_client_sendtox(
                     self->client, FTY_ASSET_AGENT, "ASSET_DETAIL", "GET", zuuid_str_canonical(uuid), parent, nullptr);
-                zmsg_t* parent_msg = mlm_client_recv(self->client);
+                zmsg_t* parent_msg = NULL;
+                if (r == 0) {
+                    zpoller_t* poller = zpoller_new(mlm_client_msgpipe(self->client), NULL);
+                    if (poller && zpoller_wait(poller, 5000)) {
+                        parent_msg = mlm_client_recv(self->client);
+                    }
+                    zpoller_destroy(&poller);
+                }
                 if (parent_msg) {
                     char* rcv_uuid = zmsg_popstr(parent_msg);
                     if (0 == strcmp(rcv_uuid, zuuid_str_canonical(uuid)) && fty_proto_is(parent_msg)) {
@@ -449,12 +456,17 @@ zlistx_t* topologyresolver_to_list(topologyresolver_t* self)
                     } else {
                         // invalid zuuid or unknown parent, topology is not complete
                         zlistx_purge(list);
+                        zstr_free(&rcv_uuid);
+                        zmsg_destroy(&parent_msg);
+                        zuuid_destroy(&uuid);
                         break;
                     }
                     zstr_free(&rcv_uuid);
+                    zmsg_destroy(&parent_msg);
                 } else {
                     // parent is unknown, topology is not complete
                     zlistx_purge(list);
+                    zuuid_destroy(&uuid);
                     break;
                 }
                 zuuid_destroy(&uuid);
