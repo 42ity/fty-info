@@ -141,13 +141,18 @@ where
 
     Value associated with ANY key MAY be NULL.
 
+Example `bmsg` request:
+```bash
+bmsg request fty-info REQUEST INFO 1234
+```
+
 #### HW Capability Request
 
 * HW_CAP/'msg-correlation-id'/'type'
 
 where:
 
-* 'type' can be gpi, gpo, serial (not supported yet)
+* 'type' can be gpi, gpo, type
 
 Response of FTY_INFO:
 
@@ -160,6 +165,11 @@ where:
 * 'offset' - offset of pin numbering (GPI pins have -1 offset, i.e. GPI 1 is pin 0, ... )
 * 'mapping' - Mapping between GPI/GPO number and HW pin number
 
+Example `bmsg` request:
+```bash
+bmsg request fty-info REQUEST HW_CAP 1234 gpi
+bmsg request fty-info REQUEST HW_CAP 1234 gpo
+```
 
 ### Stream subscriptions
 

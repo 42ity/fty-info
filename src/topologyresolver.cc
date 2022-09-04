@@ -57,16 +57,17 @@ struct _topologyresolver_t
 
 static std::map<std::string, std::set<std::string>> s_local_addresses()
 {
-    struct ifaddrs *                             interfaces, *iface;
-    char                                         host[NI_MAXHOST];
     std::map<std::string, std::set<std::string>> result;
 
+    struct ifaddrs *interfaces;
     if (getifaddrs(&interfaces) == -1) {
         return result;
     }
-    iface = interfaces;
-    for (iface = interfaces; iface != nullptr; iface = iface->ifa_next) {
-        if (iface->ifa_addr == nullptr)
+
+    char host[NI_MAXHOST];
+
+    for (struct ifaddrs *iface = interfaces; iface; iface = iface->ifa_next) {
+        if (!iface->ifa_addr)
             continue;
         int family = iface->ifa_addr->sa_family;
         if (family == AF_INET || family == AF_INET6) {
@@ -307,6 +308,8 @@ bool topologyresolver_asset(topologyresolver_t* self, fty_proto_t* message)
         return false;
     }
 
+    log_debug("case not handled (state: %d)", self->state);
+
     return false;
 }
 
@@ -314,10 +317,10 @@ bool topologyresolver_asset(topologyresolver_t* self, fty_proto_t* message)
 // Return URI of asset for this topologyresolver
 char* topologyresolver_to_rc_name_uri(topologyresolver_t* self)
 {
-    if (self && self->iname)
+    if (self && self->iname) {
         return zsys_sprintf("/asset/%s", self->iname);
-    else
-        return nullptr;
+    }
+    return nullptr;
 }
 
 //  --------------------------------------------------------------------------
@@ -335,7 +338,6 @@ char* topologyresolver_to_parent_uri(topologyresolver_t* self)
     }
     return nullptr;
 }
-
 
 //  --------------------------------------------------------------------------
 //  Return user-friendly name of the asset
@@ -452,7 +454,7 @@ zlistx_t* topologyresolver_to_list(topologyresolver_t* self)
             break;
         }
 
-        bool purgeAndBreak = false;
+        bool purgeAndBreak = false; // on error
 
         if (!zhashx_lookup(self->assets, parent)) {
             if (mlm_client_connected(self->client)) {
@@ -483,8 +485,8 @@ zlistx_t* topologyresolver_to_list(topologyresolver_t* self)
                         zlistx_add_start(list, const_cast<char*>(parent));
                     }
                     else {
-                        // invalid zuuid or unknown parent, topology is not complete
-                        log_error("reply %s ASSET_DETAIL invalid uuid", FTY_ASSET_AGENT);
+                        // invalid uuid or unknown parent, topology is not complete
+                        log_error("reply %s ASSET_DETAIL %s invalid uuid/reply", FTY_ASSET_AGENT, parent);
                         purgeAndBreak = true;
                     }
                     zstr_free(&uuid_recv);
@@ -507,7 +509,7 @@ zlistx_t* topologyresolver_to_list(topologyresolver_t* self)
         }
 
         if (purgeAndBreak) {
-            zlistx_purge(list);
+            zlistx_purge(list); // emptied
             break;
         }
     }

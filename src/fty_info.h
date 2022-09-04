@@ -63,11 +63,4 @@
 #define INFO_IP3              "ip.3"
 
 // Config file accessors
-const char* s_get(zconfig_t* config, const char* key, std::string& dfl);
 const char* s_get(zconfig_t* config, const char* key, const char* dfl);
-
-#define my_zsys_debug(verbose, ...)                                                                                    \
-    {                                                                                                                  \
-        if (verbose)                                                                                                   \
-            zsys_debug(__VA_ARGS__);                                                                                   \
-    }
