@@ -45,7 +45,7 @@
 
 #define HW_CAP_FILE "42ity-capabilities.dsc"
 
-struct _fty_info_server_t
+struct fty_info_server_t
 {
     //  Declare class properties here
     char*               name;
@@ -62,24 +62,24 @@ struct _fty_info_server_t
     char*               hw_cap_path;
 };
 
-typedef struct _fty_info_server_t fty_info_server_t;
-
-// this is kept for to handle with values set to ""
-const char* s_get(zconfig_t* config, const char* key, const char* dfl)
+// extern, this is kept for to handle with values set to ""
+const char* s_get(zconfig_t* config, const char* key, const char* default_)
 {
-    assert(config);
-    char* ret = zconfig_get(config, key, dfl);
-    if (!ret || streq(ret, ""))
-        return dfl;
-
-    return ret;
+    const char* ret = config ? zconfig_get(config, key, default_) : NULL;
+    if (ret && (*ret)) {
+        return ret;
+    }
+    return default_;
 }
 
 //  --------------------------------------------------------------------------
 //  Free wrapper for zhashx destructor
 static void history_destructor(void** item)
 {
-    free(*item);
+    if (item && (*item)) {
+        free(*item);
+        *item = nullptr;
+    }
 }
 
 //  --------------------------------------------------------------------------
@@ -87,10 +87,9 @@ static void history_destructor(void** item)
 
 fty_info_server_t* info_server_new(char* name)
 {
-    double*            numerator_ptr   = reinterpret_cast<double*>(zmalloc(sizeof(double)));
-    double*            denominator_ptr = reinterpret_cast<double*>(zmalloc(sizeof(double)));
-    fty_info_server_t* self            = new fty_info_server_t;
+    fty_info_server_t* self = new fty_info_server_t; //root_dir is a std::string!!!
     assert(self);
+
     //  Initialize class properties here
     self->name            = strdup(name);
     self->client          = mlm_client_new();
@@ -100,11 +99,16 @@ fty_info_server_t* info_server_new(char* name)
     self->history         = zhashx_new();
     self->hw_cap_path     = NULL;
     self->resolver        = topologyresolver_new(DEFAULT_RC_INAME);
+
+    double* numerator_ptr   = reinterpret_cast<double*>(zmalloc(sizeof(double)));
+    double* denominator_ptr = reinterpret_cast<double*>(zmalloc(sizeof(double)));
     zhashx_set_destructor(self->history, history_destructor);
     zhashx_insert(self->history, HIST_CPU_NUMERATOR, numerator_ptr);
     zhashx_insert(self->history, HIST_CPU_DENOMINATOR, denominator_ptr);
+
     return self;
 }
+
 //  --------------------------------------------------------------------------
 //  Destroy the fty_info_server
 
@@ -128,33 +132,26 @@ void info_server_destroy(fty_info_server_t** self_p)
     }
 }
 
-
 // return NAME (uuid first 8 digits)
-// the returned buffer should be freed
+// the returned buffer must be freed by caller
 static char* s_get_name(ftyinfo_t* info)
 {
     std::string s_name = SRV_IPC_NAME;
-    if (info && info->type && info->product && (strcmp(info->type, TXT_IPC_TYPE) != 0) &&
-        (strcmp(info->type, TXT_IPC_VA_TYPE) != 0)) {
+    if (info && info->type && info->product
+        && (strcmp(info->type, TXT_IPC_TYPE) != 0)
+        && (strcmp(info->type, TXT_IPC_VA_TYPE) != 0))
+    {
         s_name = info->product;
     }
-    char*       buffer = static_cast<char*>(malloc(s_name.length() + 12));
-    char        first_digit[9];
+
+    char first_digit[9];
     const char* uuid = ftyinfo_uuid(info);
-#if __GNUC__ >= 8
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wstringop-truncation"
-#endif
-    if (uuid) {
-        strncpy(first_digit, uuid, 8);
-    } else {
-        strncpy(first_digit, DEFAULT_UUID, 8);
-    }
-#if __GNUC__ >= 8
-#pragma GCC diagnostic pop
-#endif
-    first_digit[8] = '\0';
-    sprintf(buffer, "%s (%s)", s_name.c_str(), first_digit);
+    strncpy(first_digit, (uuid ? uuid : DEFAULT_UUID), 8);
+    first_digit[8] = 0;
+
+    char* buffer = NULL;
+    asprintf(&buffer, "%s (%s)", s_name.c_str(), first_digit);
+
     return buffer;
 }
 
@@ -183,24 +180,24 @@ static char* s_get_name(ftyinfo_t* info)
 //          txtvers
 static zmsg_t* s_create_info(ftyinfo_t* info)
 {
+    char* srv_name = s_get_name(info);
+
     zmsg_t* msg = zmsg_new();
     zmsg_addstr(msg, FTY_INFO_CMD);
-    char* srv_name = s_get_name(info);
-    if (srv_name) {
-        zmsg_addstr(msg, srv_name);
-    } else {
-        zmsg_addstr(msg, DEFAULT_UUID);
-    }
+    zmsg_addstr(msg, srv_name ? srv_name : DEFAULT_UUID);
     zmsg_addstr(msg, SRV_TYPE);
     zmsg_addstr(msg, SRV_STYPE);
     zmsg_addstr(msg, SRV_PORT);
 
-    zhash_t*  map         = ftyinfo_infohash(info);
-    zframe_t* frame_infos = zhash_pack(map);
-    zmsg_append(msg, &frame_infos);
-
     zstr_free(&srv_name);
-    zframe_destroy(&frame_infos);
+
+    const zhash_t* map = ftyinfo_infohash(info);
+    if (map) {
+        zframe_t* frame_infos = zhash_pack(const_cast<zhash_t*>(map));
+        zmsg_append(msg, &frame_infos);
+        zframe_destroy(&frame_infos);
+    }
+
     return msg;
 }
 
@@ -209,29 +206,36 @@ static zmsg_t* s_create_info(ftyinfo_t* info)
 //  subject : CREATE/UPDATE
 static void s_publish_announce(fty_info_server_t* self)
 {
-
     if (!mlm_client_connected(self->announce_client))
         return;
-    ftyinfo_t* info;
-    if (!self->test) {
-        info = ftyinfo_new(self->resolver, self->path);
-    } else
-        info = ftyinfo_test_new();
+
+    ftyinfo_t* info = (!self->test)
+        ? ftyinfo_new(self->resolver, self->path)
+        : ftyinfo_test_new();
 
     zmsg_t* msg = s_create_info(info);
 
     if (self->first_announce) {
-        if (mlm_client_send(self->announce_client, "CREATE", &msg) != -1) {
+        int r = mlm_client_send(self->announce_client, "CREATE", &msg);
+        if (r != -1) {
             log_info("publish CREATE msg on ANNOUNCE STREAM");
             self->first_announce = false;
-        } else
+        }
+        else {
             log_error("cant publish CREATE msg on ANNOUNCE STREAM");
-    } else {
-        if (mlm_client_send(self->announce_client, "UPDATE", &msg) != -1)
-            log_info("publish UPDATE msg on ANNOUNCE STREAM");
-        else
-            log_error("cant publish UPDATE msg on ANNOUNCE STREAM");
+        }
     }
+    else {
+        int r = mlm_client_send(self->announce_client, "UPDATE", &msg);
+        if (r != -1) {
+            log_info("publish UPDATE msg on ANNOUNCE STREAM");
+        }
+        else {
+            log_error("cant publish UPDATE msg on ANNOUNCE STREAM");
+        }
+    }
+
+    zmsg_destroy(&msg);
     ftyinfo_destroy(&info);
 }
 
@@ -279,51 +283,57 @@ static void s_publish_linuxmetrics(fty_info_server_t* self)
 //  --------------------------------------------------------------------------
 //  process pipe message
 //  return true means continue, false means TERM
-bool static s_handle_pipe(fty_info_server_t* self, zmsg_t* message)
+static bool s_handle_pipe(fty_info_server_t* self, zmsg_t* message)
 {
-    if (!message)
-        return true;
-    char* command = zmsg_popstr(message);
+    bool ret = true;
+
+    char* command = message ? zmsg_popstr(message) : NULL;
+    log_debug("s_handle_pipe (command: %s)", command);
+
     if (!command) {
-        zmsg_destroy(&message);
         log_warning("Empty command.");
-        return true;
     }
-    if (streq(command, "$TERM")) {
+    else if (streq(command, "$TERM")) {
         log_info("Got $TERM");
-        zmsg_destroy(&message);
-        zstr_free(&command);
-        return false;
-    } else if (streq(command, "CONNECT")) {
+        ret = false;
+    }
+    else if (streq(command, "CONNECT")) {
         char* endpoint = zmsg_popstr(message);
 
         if (endpoint) {
             if (!self->test)
                 topologyresolver_set_endpoint(self->resolver, endpoint);
+            zstr_free(&self->endpoint);
             self->endpoint = strdup(endpoint);
-            log_debug("fty-info: CONNECT: %s/%s", self->endpoint, self->name);
+            log_debug("CONNECT: %s/%s", self->endpoint, self->name);
             int rv = mlm_client_connect(self->client, self->endpoint, 1000, self->name);
-            if (rv == -1)
-                log_error("mlm_client_connect failed\n");
+            if (rv == -1) {
+                log_error("%s: mlm_client_connect failed", self->name);
+            }
         }
         zstr_free(&endpoint);
-    } else if (streq(command, "PATH")) {
+    }
+    else if (streq(command, "PATH")) {
         char* path = zmsg_popstr(message);
 
         if (path) {
+            zstr_free(&self->path);
             self->path = strdup(path);
-            log_debug("fty-info: PATH: %s", self->path);
+            log_debug("PATH: %s", self->path);
         }
         zstr_free(&path);
-    } else if (streq(command, "CONSUMER")) {
+    }
+    else if (streq(command, "CONSUMER")) {
         char* stream  = zmsg_popstr(message);
         char* pattern = zmsg_popstr(message);
         int   rv      = mlm_client_set_consumer(self->client, stream, pattern);
-        if (rv == -1)
+        if (rv == -1) {
             log_error("%s: can't set consumer on stream '%s', '%s'", self->name, stream, pattern);
+        }
         zstr_free(&pattern);
         zstr_free(&stream);
-    } else if (streq(command, "PRODUCER")) {
+    }
+    else if (streq(command, "PRODUCER")) {
         char* stream = zmsg_popstr(message);
         if (streq(stream, "ANNOUNCE-TEST") || streq(stream, "ANNOUNCE")) {
             self->test = streq(stream, "ANNOUNCE-TEST");
@@ -337,50 +347,66 @@ bool static s_handle_pipe(fty_info_server_t* self, zmsg_t* message)
                 // no response expected
             }
             int rv = mlm_client_connect(self->announce_client, self->endpoint, 1000, "fty_info_announce");
-            if (rv == -1)
+            if (rv == -1) {
                 log_error("fty_info_announce : mlm_client_connect failed\n");
+            }
             rv = mlm_client_set_producer(self->announce_client, stream);
-            if (rv == -1)
+            if (rv == -1) {
                 log_error("%s: can't set producer on stream '%s'", self->name, stream);
-            else
-                // do the first announce
+            }
+            else { // do the first announce
                 s_publish_announce(self);
-        } else if (streq(stream, "METRICS-TEST")) {
+            }
+        }
+        else if (streq(stream, "METRICS-TEST")) {
             // publish the first metrics
             // we need to keep this approach for testing purpose
             s_publish_linuxmetrics(self);
-        } else {
+        }
+        else {
             int rv = mlm_client_set_producer(self->client, stream);
-            if (rv == -1)
+            if (rv == -1) {
                 log_error("%s: can't set producer on stream '%s'", self->name, stream);
+            }
         }
         zstr_free(&stream);
-    } else if (streq(command, "LINUXMETRICSINTERVAL")) {
+    }
+    else if (streq(command, "LINUXMETRICSINTERVAL")) {
         char* interval = zmsg_popstr(message);
         log_info("Will be publishing metrics each %s seconds", interval);
         self->linuxmetrics_interval = static_cast<int>(strtol(interval, NULL, 10));
         zstr_free(&interval);
-    } else if (streq(command, "ROOT_DIR")) {
+    }
+    else if (streq(command, "ROOT_DIR")) {
         char* root_dir = zmsg_popstr(message);
         log_info("Will be using %s as root dir for finding out Linux metrics", root_dir);
-        self->root_dir.assign(root_dir);
+        self->root_dir.assign(root_dir ? root_dir : "");
         zstr_free(&root_dir);
-    } else if (streq(command, "TEST")) {
-        self->test = true;
-    } else if (streq(command, "ANNOUNCE")) {
+    }
+    else if (streq(command, "ANNOUNCE")) {
         s_publish_announce(self);
-    } else if (streq(command, "LINUXMETRICS")) {
+    }
+    else if (streq(command, "LINUXMETRICS")) {
         s_publish_linuxmetrics(self);
-    } else if (streq(command, "CONFIG")) {
-        self->hw_cap_path = zmsg_popstr(message);
-        if (!self->hw_cap_path)
-            log_error("%s: hw_cap_path missing", command);
-    } else
-        log_error("fty-info: Unknown actor command: %s.\n", command);
+    }
+    else if (streq(command, "CONFIG")) {
+        char* hw_cap_path = zmsg_popstr(message);
+        zstr_free(&self->hw_cap_path);
+        self->hw_cap_path = hw_cap_path;
+        if (!self->hw_cap_path) {
+            log_error("%s: %s hw_cap_path missing", self->name, command);
+        }
+    }
+    else if (streq(command, "TEST")) {
+        self->test = true;
+    }
+    else {
+        log_error("%s: Unknown actor command (%s)", self->name, command);
+    }
 
     zstr_free(&command);
-    zmsg_destroy(&message);
-    return true;
+
+    return ret;
 }
 
 //  fty message freefn prototype
@@ -394,97 +420,97 @@ void fty_msg_free_fn(void* data)
 }
 
 //  --------------------------------------------------------------------------
-// return zmsg_t with hw capability info or NULL if info cannot be retrieved
-static zmsg_t* s_hw_cap(fty_info_server_t* self, const char* type, char* zuuid)
+// return zmsg_t with hw capability info or empty msg if info cannot be retrieved
+static zmsg_t* s_hw_cap(fty_info_server_t* self, const char* type)
 {
-    zmsg_t*    msg = zmsg_new();
-    char*      tmp = zsys_sprintf("%s/%s", self->hw_cap_path, HW_CAP_FILE);
-    zconfig_t* cap = zconfig_load(tmp);
-    zstr_free(&tmp);
+    if (!type) type = "(null)"; //secure
 
-    if (!cap) {
-        log_debug("s_hw_cap: cannot load capability file from %s", self->hw_cap_path);
-        return msg;
+    zmsg_t* msg = zmsg_new();
+
+    zconfig_t* cap = NULL;
+    {
+        char* path = zsys_sprintf("%s/%s", self->hw_cap_path, HW_CAP_FILE);
+        log_debug("loading %s...", path);
+        cap = zconfig_load(path);
+        zstr_free(&path);
     }
 
-    if (streq(type, "gpi") || streq(type, "gpo")) {
-        char*       path  = zsys_sprintf("hardware/%s/count", type);
+    if (!cap) {
+        log_error("cannot load capability file from %s/%s", self->hw_cap_path, HW_CAP_FILE);
+
+        zmsg_addstr(msg, "ERROR");
+        zmsg_addstr(msg, "cap does not exist");
+    }
+    else if (streq(type, "gpi") || streq(type, "gpo")) {
+        char* path  = zsys_sprintf("hardware/%s/count", type);
         const char* count = s_get(cap, path, "");
         zstr_free(&path);
 
-        zmsg_addstr(msg, zuuid);
         zmsg_addstr(msg, "OK");
         zmsg_addstr(msg, type);
-        zmsg_addstr(msg, count);
-        if (streq(count, "0"))
-            goto out;
+        zmsg_addstr(msg, count ? count : "0");
 
-        path           = zsys_sprintf("hardware/%s/base_address", type);
-        const char* ba = s_get(cap, path, "");
-        zstr_free(&path);
-        zmsg_addstr(msg, ba);
+        if (!streq(count, "0")) {
+            path = zsys_sprintf("hardware/%s/base_address", type);
+            const char* ba = s_get(cap, path, "");
+            zstr_free(&path);
+            zmsg_addstr(msg, ba);
 
-        path               = zsys_sprintf("hardware/%s/offset", type);
-        const char* offset = s_get(cap, path, "");
-        zstr_free(&path);
-        zmsg_addstr(msg, offset);
+            path = zsys_sprintf("hardware/%s/offset", type);
+            const char* offset = s_get(cap, path, "");
+            zstr_free(&path);
+            zmsg_addstr(msg, offset);
 
-        path           = zsys_sprintf("hardware/%s/mapping", type);
-        zconfig_t* ret = zconfig_locate(cap, path);
-        zstr_free(&path);
+            path = zsys_sprintf("hardware/%s/mapping", type);
+            zconfig_t* ret = zconfig_locate(cap, path);
+            zstr_free(&path);
 
-        if (ret) {
-            ret = zconfig_child(ret);
-            while (ret != NULL) {
-                zmsg_addstr(msg, zconfig_name(ret));
-                zmsg_addstr(msg, zconfig_value(ret));
-
-                ret = zconfig_next(ret);
+            if (ret) {
+                ret = zconfig_child(ret);
+                while (ret) {
+                    zmsg_addstr(msg, zconfig_name(ret));
+                    zmsg_addstr(msg, zconfig_value(ret));
+                    ret = zconfig_next(ret);
+                }
+                zconfig_destroy(&ret); //always NULL here!?
             }
-            zconfig_destroy(&ret);
         }
-    } else if (streq(type, "serial")) {
-        // not implemented yet
-    } else if (streq(type, "type")) {
-        zmsg_addstr(msg, zuuid);
+    }
+    else if (streq(type, "type")) {
         zmsg_addstr(msg, "OK");
         zmsg_addstr(msg, type);
         zmsg_addstr(msg, s_get(cap, "hardware/type", ""));
-    } else {
-        log_info("s_hw_cap: unsuported request for '%s'", type);
+    }
+    else {
+        log_error("unsupported request for '%s'", type);
 
-        zmsg_addstr(msg, zuuid);
         zmsg_addstr(msg, "ERROR");
-        zmsg_addstr(msg, "unsupported type");
+        zmsg_addstrf(msg, "unsupported type");
     }
 
-out:
     zconfig_destroy(&cap);
+
     return msg;
 }
-
 
 //  --------------------------------------------------------------------------
 //  process message from FTY_PROTO_ASSET stream
 void static s_handle_stream(fty_info_server_t* self, zmsg_t* message)
 {
-    if (!fty_proto_is(message)) {
+    if (!(message && fty_proto_is(message))) {
         return;
     }
 
     zmsg_t* aux = zmsg_dup(message);
     fty_proto_t* fproto = fty_proto_decode(&aux);
     zmsg_destroy(&aux);
-    if (!fproto) {
-        log_error("can't decode message with subject %s, ignoring", mlm_client_subject(self->client));
-        return;
-    }
-    if (fty_proto_id(fproto) != FTY_PROTO_ASSET) {
-        fty_proto_destroy(&fproto);
-        return;
-    }
-    if (topologyresolver_asset(self->resolver, fproto)) {
-        s_publish_announce(self);
+
+    if (fproto && (fty_proto_id(fproto) == FTY_PROTO_ASSET)) {
+        log_debug("s_handle_stream ASSET %s (%s)", fty_proto_name(fproto), fty_proto_operation(fproto));
+
+        if (topologyresolver_asset(self->resolver, fproto)) {
+            s_publish_announce(self);
+        }
     }
 
     fty_proto_destroy(&fproto);
@@ -492,65 +518,64 @@ void static s_handle_stream(fty_info_server_t* self, zmsg_t* message)
 
 //  --------------------------------------------------------------------------
 //  process message from MAILBOX DELIVER
+//  bmsg request fty-info REQUEST INFO <uuid>
+//  bmsg request fty-info REQUEST HW_CAP <uuid> <"type"|"gpi"|"gpo">
+
 void static s_handle_mailbox(fty_info_server_t* self, zmsg_t* message)
 {
-    char* command = zmsg_popstr(message);
-    if (!command) {
-        log_warning("Empty command.");
-        return;
-    }
+    const char* sender = mlm_client_sender(self->client);
+    char* command = message ? zmsg_popstr(message) : NULL;
+    char* zuuid = message ? zmsg_popstr(message) : NULL;
 
-    char*   zuuid = zmsg_popstr(message);
+    log_info("handle_mailbox (sender: %s, command: %s, zuuid: %s)", sender, command, zuuid);
+
     zmsg_t* reply = NULL;
 
     // we assume all request command are MAILBOX DELIVER, and with any subject"
-    if (streq(command, "INFO")) {
+    if (!command) {
+        log_debug("Empty command");
+    }
+    else if (streq(command, "INFO")) {
         ftyinfo_t* info = ftyinfo_new(self->resolver, self->path);
-
         reply = s_create_info(info);
-        zmsg_pushstrf(reply, "%s", zuuid);
         ftyinfo_destroy(&info);
-    } else if (streq(command, "INFO-TEST")) {
-        ftyinfo_t* info = ftyinfo_test_new();
-
-        reply = s_create_info(info);
-        zmsg_pushstrf(reply, "%s", zuuid);
-        ftyinfo_destroy(&info);
-    } else if (streq(command, "HW_CAP")) {
+    }
+    else if (streq(command, "HW_CAP")) {
         char* type = zmsg_popstr(message);
-        if (type)
-            reply = s_hw_cap(self, type, zuuid);
-
-        if (zmsg_size(reply) == 0) {
-            zmsg_pushstrf(reply, "%s", zuuid);
-            zmsg_addstr(reply, "ERROR");
-            zmsg_addstr(reply, "cap does not exist");
-        }
+        reply = s_hw_cap(self, type);
         zstr_free(&type);
-    } else if (streq(command, "ERROR")) {
-        // Don't reply to ERROR messages
+    }
+    else if (streq(command, "INFO-TEST")) {
+        ftyinfo_t* info = ftyinfo_test_new();
+        reply = s_create_info(info);
+        ftyinfo_destroy(&info);
+    }
+    else if (streq(command, "ERROR")) {
+        // Don't reply to ERROR messages ?!
         log_warning("%s: Received ERROR command from '%s', ignoring", self->name, mlm_client_sender(self->client));
-    } else {
+    }
+    else {
         log_warning("%s: Received unexpected command '%s' from '%s'", self->name, command, mlm_client_sender(self->client));
 
         reply = zmsg_new();
-        if (NULL != zuuid)
-            zmsg_addstr(reply, zuuid);
-
         zmsg_addstr(reply, "ERROR");
-        zmsg_addstr(reply, "unexpected command");
+        zmsg_addstrf(reply, "unexpected command");
     }
 
     if (reply) {
-        int rv = mlm_client_sendto(self->client, mlm_client_sender(self->client), "info", NULL, 1000, &reply);
-        if (rv != 0)
-            log_error("s_handle_mailbox: failed to send reply to %s ", mlm_client_sender(self->client));
+        zmsg_pushstrf(reply, "%s", zuuid ? zuuid : "missing-uuid"); // enforce reply w/ uuid
+
+        int rv = mlm_client_sendto(self->client, sender, "info", NULL, 1000, &reply);
+        if (rv != 0) {
+            log_error("%s: failed to send reply to %s ", self->name, sender);
+        }
     }
 
     zmsg_destroy(&reply);
     zstr_free(&zuuid);
     zstr_free(&command);
 }
+
 //  --------------------------------------------------------------------------
 //  Create a new fty_info_server
 
@@ -562,12 +587,22 @@ void fty_info_server(zsock_t* pipe, void* args)
         return;
     }
 
-    fty_info_server_t* self   = info_server_new(name);
-    zpoller_t*         poller = zpoller_new(pipe, mlm_client_msgpipe(self->client), NULL);
-    assert(poller);
+    fty_info_server_t* self = info_server_new(name);
+    if (!self) {
+        log_error("info_server_new() failed");
+        return;
+    }
+
+    zpoller_t* poller = zpoller_new(pipe, mlm_client_msgpipe(self->client), NULL);
+    if (!poller) {
+        log_error("zpoller_new() failed");
+        info_server_destroy(&self);
+        return;
+    }
+
+    log_info("fty-info: Started");
 
     zsock_signal(pipe, 0);
-    log_info("fty-info: Started");
 
     while (!zsys_interrupted) {
         void* which = zpoller_wait(poller, TIMEOUT_MS);
@@ -576,21 +611,22 @@ void fty_info_server(zsock_t* pipe, void* args)
                 break;
             }
         }
-        if (which == pipe) {
+        else if (which == pipe) {
             log_trace("which == pipe");
-            if (!s_handle_pipe(self, zmsg_recv(pipe)))
-                break; // TERM
-            else
-                continue;
-        } else if (which == mlm_client_msgpipe(self->client)) {
+            zmsg_t* message = zmsg_recv(pipe);
+            bool res = s_handle_pipe(self, message);
+            zmsg_destroy(&message);
+            if (!res) {
+                break; // $TERM
+            }
+        }
+        else if (which == mlm_client_msgpipe(self->client)) {
             zmsg_t* message = mlm_client_recv(self->client);
-            if (!message)
-                continue;
-
             const char* command = mlm_client_command(self->client);
             if (streq(command, "STREAM DELIVER")) {
                 s_handle_stream(self, message);
-            } else if (streq(command, "MAILBOX DELIVER")) {
+            }
+            else if (streq(command, "MAILBOX DELIVER")) {
                 s_handle_mailbox(self, message);
             }
             zmsg_destroy(&message);
@@ -599,4 +635,6 @@ void fty_info_server(zsock_t* pipe, void* args)
 
     zpoller_destroy(&poller);
     info_server_destroy(&self);
+
+    log_info("fty-info: Ended");
 }

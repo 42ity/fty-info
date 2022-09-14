@@ -66,13 +66,12 @@ static double s_get_field(std::string line, int index)
     }
 }
 
-
 // Get line number n (counted from 1)
 static std::string s_getline_by_number(std::string filename, int index)
 {
     std::ifstream file(filename, std::ifstream::in);
     if (!file) {
-        log_error("Could not open '%s'", filename.c_str());
+        log_debug("Could not open '%s'", filename.c_str());
         return "";
     }
 
@@ -140,33 +139,35 @@ static linuxmetric_t* s_uptime(const std::string& root_dir)
 
 static linuxmetric_t* s_cpu_usage(const std::string& root_dir, zhashx_t* history)
 {
-    std::string line_cpu                = s_getline_by_name(root_dir + "proc/stat", "cpu");
-    double      user                    = s_get_field(line_cpu, 2);
-    double      nice                    = s_get_field(line_cpu, 3);
-    double      system                  = s_get_field(line_cpu, 4);
-    double      idle                    = s_get_field(line_cpu, 5);
-    double      iowait                  = s_get_field(line_cpu, 6);
-    double      irq                     = s_get_field(line_cpu, 7);
-    double      softirq                 = s_get_field(line_cpu, 8);
-    double      steal                   = s_get_field(line_cpu, 9);
-    double      numerator               = idle + iowait;
-    double      denominator             = user + nice + system + idle + iowait + irq + softirq + steal;
-    double*     history_numerator_ptr   = static_cast<double*>(zhashx_lookup(history, HIST_CPU_NUMERATOR));
-    double*     history_denominator_ptr = static_cast<double*>(zhashx_lookup(history, HIST_CPU_DENOMINATOR));
-    double      history_numerator       = 0;
-    double      history_denominator     = 0;
+    std::string line_cpu = s_getline_by_name(root_dir + "proc/stat", "cpu");
+    double user    = s_get_field(line_cpu, 2);
+    double nice    = s_get_field(line_cpu, 3);
+    double system  = s_get_field(line_cpu, 4);
+    double idle    = s_get_field(line_cpu, 5);
+    double iowait  = s_get_field(line_cpu, 6);
+    double irq     = s_get_field(line_cpu, 7);
+    double softirq = s_get_field(line_cpu, 8);
+    double steal   = s_get_field(line_cpu, 9);
 
+    double numerator   = idle + iowait;
+    double denominator = user + nice + system + idle + iowait + irq + softirq + steal;
+
+    double* history_numerator_ptr   = static_cast<double*>(zhashx_lookup(history, HIST_CPU_NUMERATOR));
+    double* history_denominator_ptr = static_cast<double*>(zhashx_lookup(history, HIST_CPU_DENOMINATOR));
+
+    double history_numerator   = 0;
+    double history_denominator = 0;
     if (history_numerator_ptr && history_denominator_ptr) {
         history_numerator   = *history_numerator_ptr;
         history_denominator = *history_denominator_ptr;
     }
 
     linuxmetric_t* cpu_usage_info = linuxmetric_new();
-    cpu_usage_info->type          = strdup(LINUXMETRIC_CPU_USAGE);
-    cpu_usage_info->value =
-        s_round(100 - 100 * ((numerator - history_numerator) / (denominator - history_denominator)));
+    cpu_usage_info->type = strdup(LINUXMETRIC_CPU_USAGE);
+    cpu_usage_info->value = s_round(100 - 100 * ((numerator - history_numerator) / (denominator - history_denominator)));
     cpu_usage_info->unit = "%";
-    /* update or insert numerator and denominator to history */
+
+    // update or insert numerator and denominator to history
     if (history_numerator_ptr)
         *history_numerator_ptr = numerator;
     if (history_denominator_ptr)
@@ -433,8 +434,7 @@ linuxmetric_t* linuxmetric_new(void)
 
 void linuxmetric_destroy(linuxmetric_t** self_p)
 {
-    assert(self_p);
-    if (*self_p) {
+    if (self_p && (*self_p)) {
         linuxmetric_t* self = *self_p;
         //  Free class properties here
         zstr_free(&self->type);
@@ -458,10 +458,8 @@ zhashx_t* linuxmetric_list_interfaces(const std::string& root_dir)
 
         // we are not interested in loopback
         if (iface != "lo") {
-            if (is_interface_online(iface.c_str(), root_dir))
-                zhashx_update(interfaces, iface.c_str(), const_cast<char*>("up"));
-            else
-                zhashx_update(interfaces, iface.c_str(), const_cast<char*>("down"));
+            bool isUp = is_interface_online(iface.c_str(), root_dir);
+            zhashx_update(interfaces, iface.c_str(), const_cast<char*>(isUp ? "up" : "down"));
         }
     }
 
@@ -477,10 +475,12 @@ zlistx_t* linuxmetric_get_all(int interval, zhashx_t* history, const std::string
 
     linuxmetric_t* uptime = s_uptime(root_dir);
     zlistx_add_end(info, uptime);
+
     linuxmetric_t* cpu_usage = s_cpu_usage(root_dir, history);
     zlistx_add_end(info, cpu_usage);
+
     linuxmetric_t* cpu_temperature = s_cpu_temperature(root_dir);
-    if (cpu_temperature != NULL)
+    if (cpu_temperature)
         zlistx_add_end(info, cpu_temperature);
 
     zlistx_t*      meminfo    = s_meminfo(root_dir);
@@ -507,7 +507,8 @@ zlistx_t* linuxmetric_get_all(int interval, zhashx_t* history, const std::string
             flash_metric = static_cast<linuxmetric_t*>(zlistx_next(flash_info));
         }
         zlistx_destroy(&flash_info);
-    } else {
+    }
+    else { // tests
         linuxmetric_t* sdcard_total_info = linuxmetric_new();
         sdcard_total_info->type          = strdup(LINUXMETRIC_DATA0_TOTAL);
         sdcard_total_info->value         = 10;
@@ -549,7 +550,7 @@ zlistx_t* linuxmetric_get_all(int interval, zhashx_t* history, const std::string
     zhashx_t* interfaces = linuxmetric_list_interfaces(root_dir);
 
     const char* state = reinterpret_cast<const char*>(zhashx_first(interfaces));
-    while (state != NULL) {
+    while (state) {
         const char* iface = reinterpret_cast<const char*>(zhashx_cursor(interfaces));
         log_trace("interface %s = %s", iface, state);
 
@@ -571,15 +572,16 @@ zlistx_t* linuxmetric_get_all(int interval, zhashx_t* history, const std::string
             zlistx_destroy(&tx);
 
             linuxmetric_t* rx_error = s_network_error_ratio(iface, "rx", history, root_dir);
-            if (rx_error != NULL)
+            if (rx_error)
                 zlistx_add_end(info, rx_error);
 
             linuxmetric_t* tx_error = s_network_error_ratio(iface, "tx", history, root_dir);
-            if (tx_error != NULL)
+            if (tx_error)
                 zlistx_add_end(info, tx_error);
         }
         state = reinterpret_cast<const char*>(zhashx_next(interfaces));
     }
     zhashx_destroy(&interfaces);
+
     return info;
 }

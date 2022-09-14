@@ -26,7 +26,6 @@ TEST_CASE("info server test")
     mlm_client_t* client = mlm_client_new();
     mlm_client_connect(client, endpoint, 1000, "fty_info_server_test");
 
-
     zactor_t* info_server = zactor_new(fty_info_server, const_cast<char*>("fty-info"));
     zstr_sendx(info_server, "TEST", NULL);
     zstr_sendx(info_server, "PATH", DEFAULT_PATH, NULL);
@@ -127,6 +126,7 @@ TEST_CASE("info server test")
         zmsg_destroy(&request);
         zuuid_destroy(&zuuid);
     }
+
     // Test #2: request INFO
     {
         zmsg_t* request = zmsg_new();
@@ -172,9 +172,11 @@ TEST_CASE("info server test")
         zmsg_destroy(&request);
         zuuid_destroy(&zuuid);
     }
+
     mlm_client_t* asset_generator = mlm_client_new();
     mlm_client_connect(asset_generator, endpoint, 1000, "fty_info_asset_generator");
     mlm_client_set_producer(asset_generator, FTY_PROTO_STREAM_ASSETS);
+
     // Test #3: process asset message - CREATE RC
     {
         const char* name   = TST_NAME;
@@ -190,11 +192,11 @@ TEST_CASE("info server test")
         zhash_update(ext, "ip.1", const_cast<char*>("127.0.0.1"));
 
         zmsg_t* msg = fty_proto_encode_asset(aux, TST_INAME, FTY_PROTO_ASSET_OP_CREATE, ext);
+        zhash_destroy(&aux);
+        zhash_destroy(&ext);
 
         int rv = mlm_client_send(asset_generator, "device.rackcontroller@rackcontroller-0", &msg);
         REQUIRE(rv == 0);
-        zhash_destroy(&aux);
-        zhash_destroy(&ext);
 
         zclock_sleep(1000);
 
@@ -245,6 +247,7 @@ TEST_CASE("info server test")
         zmsg_destroy(&request);
         zuuid_destroy(&zuuid);
     }
+
     // TEST #4: process asset message - UPDATE RC (change location)
     {
         zhash_t* aux = zhash_new();
@@ -260,11 +263,11 @@ TEST_CASE("info server test")
         zhash_update(ext, "ip.1", const_cast<char*>("127.0.0.1"));
 
         zmsg_t* msg = fty_proto_encode_asset(aux, TST_INAME, FTY_PROTO_ASSET_OP_UPDATE, ext);
+        zhash_destroy(&aux);
+        zhash_destroy(&ext);
 
         int rv = mlm_client_send(asset_generator, "device.rackcontroller@rackcontroller-0", &msg);
         REQUIRE(rv == 0);
-        zhash_destroy(&aux);
-        zhash_destroy(&ext);
 
         zclock_sleep(1000);
 
@@ -315,6 +318,7 @@ TEST_CASE("info server test")
         zmsg_destroy(&request);
         zuuid_destroy(&zuuid);
     }
+
     // TEST #5: process asset message - do not process CREATE RC with IP address
     // which does not belong to us
     {
@@ -330,11 +334,11 @@ TEST_CASE("info server test")
         zhash_update(ext, "ip.1", const_cast<char*>("300.3000.300.300"));
 
         zmsg_t* msg = fty_proto_encode_asset(aux, TST_INAME, FTY_PROTO_ASSET_OP_CREATE, ext);
+        zhash_destroy(&aux);
+        zhash_destroy(&ext);
 
         int rv = mlm_client_send(asset_generator, "device.rack controller@rackcontroller-0", &msg);
         REQUIRE(rv == 0);
-        zhash_destroy(&aux);
-        zhash_destroy(&ext);
 
         zclock_sleep(1000);
 
@@ -386,6 +390,7 @@ TEST_CASE("info server test")
         zmsg_destroy(&request);
         zuuid_destroy(&zuuid);
     }
+
     // TEST #6 : test STREAM announce
     {
         int rv = mlm_client_set_consumer(client, "ANNOUNCE-TEST", ".*");
@@ -474,6 +479,7 @@ TEST_CASE("info server test")
         zhash_destroy(&infos);
         zmsg_destroy(&recv);
     }
+
     // TEST #7 : test metrics - just types
     {
         std::string str_SELFTEST_DIR_RO = std::string(SELFTEST_DIR_RO);
@@ -616,8 +622,9 @@ TEST_CASE("info server test")
         zhashx_destroy(&interfaces);
         zhashx_destroy(&metrics);
     }
+
+    // TEST #8: hw capability info
     {
-        // TEST #8: hw capability info
         zstr_sendx(info_server, "CONFIG", "tests/selftest-ro/data/hw_cap", NULL);
 
         zmsg_t* hw_req = zmsg_new();
@@ -658,8 +665,9 @@ TEST_CASE("info server test")
 
         zmsg_destroy(&recv);
     }
+
+    // TEST #9: hw capability info
     {
-        // TEST #9: hw capability info
         zmsg_t* hw_req = zmsg_new();
         zmsg_addstr(hw_req, "HW_CAP");
         zmsg_addstr(hw_req, "uuid1234");
@@ -683,8 +691,9 @@ TEST_CASE("info server test")
 
         zmsg_destroy(&recv);
     }
+
+    // TEST #10: hw capability: type
     {
-        // TEST #10: hw capability: type
         zmsg_t* hw_req = zmsg_new();
         zmsg_addstr(hw_req, "HW_CAP");
         zmsg_addstr(hw_req, "uuid1235");

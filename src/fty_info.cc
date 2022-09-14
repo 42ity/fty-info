@@ -55,13 +55,12 @@ int main(int argc, char* argv[])
     char*       endpoint                  = NULL;
     char*       path                      = NULL;
     bool        verbose                   = false;
-    int         argn;
     const char* hw_cap_path = "/usr/share/fty";
 
     ManageFtyLog::setInstanceFtylog(FTY_INFO_AGENT, FTY_COMMON_LOGGING_DEFAULT_CFG);
 
     // Parse command line
-    for (argn = 1; argn < argc; argn++) {
+    for (int argn = 1; argn < argc; argn++) {
         char* param = NULL;
         if (argn < argc - 1)
             param = argv[argn + 1];

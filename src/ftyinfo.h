@@ -65,7 +65,6 @@
 #define NETWORK_HISTORY_PREFIX "network_history"
 
 //  Structure of our class
-
 struct _ftyinfo_t
 {
     zhash_t* infos;
@@ -106,4 +105,4 @@ void ftyinfo_destroy(ftyinfo_t** self_p);
 // getters
 const char* ftyinfo_uuid(ftyinfo_t* self);
 
-zhash_t* ftyinfo_infohash(ftyinfo_t* self);
+const zhash_t* ftyinfo_infohash(ftyinfo_t* self);
