@@ -32,6 +32,7 @@
 #include "topologyresolver.h"
 #include <fty_log.h>
 #include <fty_proto.h>
+#include <fty_common.h>
 #include <malamute.h>
 
 //  Structure of our class
@@ -137,13 +138,15 @@ static int handle_stream(fty_info_rc0_runonce_t* self, zmsg_t* msgIn)
     }
 
     // just for rackcontroller-0
-    int changeRW = 0;
-    int changeRO = 0;
+    char changeRW = 0; // bool 0/1
+    char changeRO = 0;
 
     fty_proto_t* messageRO = fty_proto_dup(message);
-    zhash_t*     ext       = zhash_new();
-    zhash_autofree(ext);
-    fty_proto_set_ext(messageRO, &ext);
+    {
+        zhash_t* ext = zhash_new();
+        zhash_autofree(ext);
+        fty_proto_set_ext(messageRO, &ext); // ext owned by proto
+    }
     fty_proto_t* messageRW = fty_proto_dup(messageRO);
 
     const char* data = fty_proto_ext_string(message, "uuid", NULL);
@@ -248,37 +251,37 @@ static int handle_stream(fty_info_rc0_runonce_t* self, zmsg_t* msgIn)
         }
     }
 
-    if (0 != changeRO) {
+    bool sendtoSuccess = true;
+    const int timeout_ms = 5000;
+
+    if (changeRO) {
         fty_proto_t* messageDup = fty_proto_dup(messageRO);
         zmsg_t*      msgDup     = fty_proto_encode(&messageDup);
         zmsg_pushstrf(msgDup, "%s", "READONLY");
-        int rv = mlm_client_sendto(self->client, "asset-agent", "ASSET_MANIPULATION", NULL, 10, &msgDup);
+        int rv = mlm_client_sendto(self->client, AGENT_FTY_ASSET, "ASSET_MANIPULATION", NULL, timeout_ms, &msgDup);
+        zmsg_destroy(&msgDup);
         if (rv == -1) {
-            log_error("Failed to send ASSET_MANIPULATION message to asset-agent");
-            fty_proto_destroy(&message);
-            fty_proto_destroy(&messageRO);
-            fty_proto_destroy(&messageRW);
-            return -1;
+            log_error("Failed to send ASSET_MANIPULATION message to %s", AGENT_FTY_ASSET);
+            sendtoSuccess = false;
         }
     }
-    if (changeRW != 0) {
+    if (changeRW) {
         fty_proto_t* messageDup = fty_proto_dup(messageRW);
         zmsg_t*      msgDup     = fty_proto_encode(&messageDup);
         zmsg_pushstrf(msgDup, "%s", "READWRITE");
-        int rv = mlm_client_sendto(self->client, "asset-agent", "ASSET_MANIPULATION", NULL, 10, &msgDup);
+        int rv = mlm_client_sendto(self->client, AGENT_FTY_ASSET, "ASSET_MANIPULATION", NULL, timeout_ms, &msgDup);
+        zmsg_destroy(&msgDup);
         if (rv == -1) {
-            log_error("Failed to send ASSET_MANIPULATION message to asset-agent");
-            fty_proto_destroy(&message);
-            fty_proto_destroy(&messageRO);
-            fty_proto_destroy(&messageRW);
-            return -1;
+            log_error("Failed to send ASSET_MANIPULATION message to %s", AGENT_FTY_ASSET);
+            sendtoSuccess = false;
         }
     }
 
     fty_proto_destroy(&message);
     fty_proto_destroy(&messageRO);
     fty_proto_destroy(&messageRW);
-    return 1;
+
+    return sendtoSuccess ? 1 : -1;
 }
 
 
