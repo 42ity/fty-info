@@ -33,6 +33,7 @@
 #include <cxxtools/jsondeserializer.h>
 #include <fstream>
 #include <fty_log.h>
+#include <fty_common.h>
 #include <fty_shm.h>
 #include <ifaddrs.h>
 #include <istream>
@@ -339,7 +340,7 @@ static bool s_handle_pipe(fty_info_server_t* self, zmsg_t* message)
             self->test = streq(stream, "ANNOUNCE-TEST");
             if (!self->test) {
                 zmsg_t* republish = zmsg_new();
-                int rv = mlm_client_sendto(self->client, FTY_ASSET_AGENT, "REPUBLISH", NULL, 5000, &republish);
+                int rv = mlm_client_sendto(self->client, AGENT_FTY_ASSET, "REPUBLISH", NULL, 5000, &republish);
                 zmsg_destroy(&republish);
                 if (rv != 0) {
                     log_error("%s: cannot send REPUBLISH message", self->name);

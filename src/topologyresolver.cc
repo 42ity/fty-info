@@ -32,6 +32,7 @@
 #include <set>
 #include <string>
 #include <fty_log.h>
+#include <fty_common.h>
 #include "fty_info.h"
 
 // State
@@ -462,18 +463,18 @@ zlistx_t* topologyresolver_to_list(topologyresolver_t* self)
                 zuuid_t* uuid = zuuid_new();
                 const char* uuid_sent = zuuid_str_canonical(uuid);
 
-                log_debug("ask %s for ASSET_DETAIL, RC = %s, iname = %s", FTY_ASSET_AGENT, self->iname, parent);
+                log_debug("ask %s for ASSET_DETAIL, RC = %s, iname = %s", AGENT_FTY_ASSET, self->iname, parent);
                 zmsg_t* reply = NULL;
-                int r = mlm_client_sendtox(self->client, FTY_ASSET_AGENT, "ASSET_DETAIL", "GET", uuid_sent, parent, nullptr);
+                int r = mlm_client_sendtox(self->client, AGENT_FTY_ASSET, "ASSET_DETAIL", "GET", uuid_sent, parent, nullptr);
                 if (r != 0) {
-                    log_error("sendto %s ASSET_DETAIL %s failed (r : %d)", FTY_ASSET_AGENT, parent, r);
+                    log_error("sendto %s ASSET_DETAIL %s failed (r : %d)", AGENT_FTY_ASSET, parent, r);
                 }
                 else {
                     zpoller_t* poller = zpoller_new(mlm_client_msgpipe(self->client), NULL);
                     reply = (poller && zpoller_wait(poller, 5000)) ? mlm_client_recv(self->client) : NULL;
                     zpoller_destroy(&poller);
                     if (!reply) {
-                        log_error("reply %s ASSET_DETAIL %s is empty", FTY_ASSET_AGENT, parent);
+                        log_error("reply %s ASSET_DETAIL %s is empty", AGENT_FTY_ASSET, parent);
                     }
                 }
 
@@ -486,7 +487,7 @@ zlistx_t* topologyresolver_to_list(topologyresolver_t* self)
                     }
                     else {
                         // invalid uuid or unknown parent, topology is not complete
-                        log_error("reply %s ASSET_DETAIL %s invalid uuid/reply", FTY_ASSET_AGENT, parent);
+                        log_error("reply %s ASSET_DETAIL %s invalid uuid/reply", AGENT_FTY_ASSET, parent);
                         purgeAndBreak = true;
                     }
                     zstr_free(&uuid_recv);
