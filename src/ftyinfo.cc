@@ -150,7 +150,7 @@ ftyinfo_t* ftyinfo_new(topologyresolver_t* resolver, const char* path)
 
     // set hostname
     char hostname[HOST_NAME_MAX + 1];
-    int rv = gethostname(hostname, sizeof(hosname));
+    int rv = gethostname(hostname, sizeof(hostname));
     if (rv == -1) {
         log_warning("ftyinfo could not be fully initialized (error while getting the hostname)");
         self->hostname = strdup("localhost");
