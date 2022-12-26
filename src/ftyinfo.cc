@@ -101,21 +101,14 @@ static cxxtools::SerializationInfo* s_load_release_details()
 
 static char* s_get_release_details(cxxtools::SerializationInfo& si, const char* key, const char* dfl)
 {
-    std::string value;
     try {
+        std::string value;
         si.getMember("release-details").getMember(key) >>= value;
+        return strdup(value.c_str());
     } catch (const std::exception& e) {
-        log_info("Problem with getting %s in JSON: %s", key, e.what());
-        if (dfl) {
-            return strdup(dfl);
-        } else {
-            return NULL;
-        }
+        log_error("Problem with getting %s in JSON: %s", key, e.what());
     }
-    if (value.empty() && dfl) {
-        return strdup(dfl);
-    }
-    return strdup(value.c_str());
+    return dfl ? strdup(dfl) : NULL;
 }
 
 static cxxtools::SerializationInfo* s_load_branding_info()
@@ -136,21 +129,14 @@ static cxxtools::SerializationInfo* s_load_branding_info()
 
 static char* s_get_branding_info(cxxtools::SerializationInfo& si, const char* key, const char* dfl)
 {
-    std::string value;
     try {
+        std::string value;
         si.getMember(key) >>= value;
+        return strdup(value.c_str());
     } catch (const std::exception& e) {
-        log_info("Problem with getting %s in JSON: %s", key, e.what());
-        if (dfl) {
-            return strdup(dfl);
-        } else {
-            return NULL;
-        }
+        log_error("Problem with getting %s in JSON: %s", key, e.what());
     }
-    if (value.empty() && dfl) {
-        return strdup(dfl);
-    }
-    return strdup(value.c_str());
+    return dfl ? strdup(dfl) : NULL;
 }
 
 //  --------------------------------------------------------------------------
@@ -159,18 +145,18 @@ static char* s_get_branding_info(cxxtools::SerializationInfo& si, const char* ke
 ftyinfo_t* ftyinfo_new(topologyresolver_t* resolver, const char* path)
 {
     ftyinfo_t* self = static_cast<ftyinfo_t*>(zmalloc(sizeof(ftyinfo_t)));
-    self->infos     = zhash_new();
+
+    self->infos = zhash_new();
 
     // set hostname
-    char* hostname = static_cast<char*>(malloc(HOST_NAME_MAX + 1));
-    int   rv       = gethostname(hostname, HOST_NAME_MAX + 1);
+    char hostname[HOST_NAME_MAX + 1];
+    int rv = gethostname(hostname, sizeof(hosname));
     if (rv == -1) {
         log_warning("ftyinfo could not be fully initialized (error while getting the hostname)");
-        self->hostname = strdup("locahost");
+        self->hostname = strdup("localhost");
     } else {
         self->hostname = strdup(hostname);
     }
-    zstr_free(&hostname);
     log_info("fty-info:hostname  = '%s'", self->hostname);
 
     // set id
@@ -257,26 +243,25 @@ ftyinfo_t* ftyinfo_new(topologyresolver_t* resolver, const char* path)
     log_info("fty-info:txtvers         = '%s'", self->txtvers);
 
     // search for IPv4 addresses
-    int counter = 0;
-    for (counter = 0; counter < 3; ++counter) {
-        self->ip[counter] = NULL;
+    const int IP_SIZE = int(sizeof(self->ip) / sizeof(self->ip[0]));
+    for (int i = 0; i < IP_SIZE; i++) {
+        self->ip[i] = NULL;
     }
-    counter = 0;
-    struct ifaddrs *interfaces, *iface;
+    struct ifaddrs *interfaces = NULL;
     if (getifaddrs(&interfaces) != -1) {
-        char            host[NI_MAXHOST];
-        for (iface = interfaces; iface != NULL; iface = iface->ifa_next) {
+        char host[NI_MAXHOST];
+        int counter = 0;
+        for (struct ifaddrs *iface = interfaces; iface != NULL; iface = iface->ifa_next) {
             if (iface->ifa_addr == NULL)
                 continue;
-            // here we support IPv4 only, only get first 3 addresses
+            // here we support IPv4 only, only get first IP_SIZE addresses
             if (iface->ifa_addr->sa_family == AF_INET
                 && 0 == getnameinfo(iface->ifa_addr, sizeof(struct sockaddr_in),
                         host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST)
             ) {
-                self->ip[counter] = strdup(host);
-                ++counter;
+                self->ip[counter++] = strdup(host);
             }
-            if (counter == 3) {
+            if (counter == IP_SIZE) {
                 break;
             }
         }
@@ -306,6 +291,7 @@ ftyinfo_t* ftyinfo_test_new(void)
     self->name_uri         = strdup(TST_NAME_URI);
     self->product          = strdup(TST_PRODUCT);
     self->vendor           = strdup(TST_VENDOR);
+    // self->manufacturer is skipped!?
     self->licensing_portal = strdup(TST_LIC_URL);
     self->serial           = strdup(TST_SERIAL);
     self->part_number      = strdup(TST_PART_NUMBER);
@@ -332,52 +318,37 @@ void ftyinfo_destroy(ftyinfo_t** self_ptr)
         return;
     if (*self_ptr) {
         ftyinfo_t* self = *self_ptr;
+
         // Free class properties here
         zhash_destroy(&self->infos);
-        if (self->id)
-            zstr_free(&self->id);
-        if (self->uuid)
-            zstr_free(&self->uuid);
-        if (self->hostname)
-            zstr_free(&self->hostname);
-        if (self->name)
-            zstr_free(&self->name);
-        if (self->name_uri)
-            zstr_free(&self->name_uri);
-        if (self->product)
-            zstr_free(&self->product);
-        if (self->vendor)
-            zstr_free(&self->vendor);
-        if (self->manufacturer)
-            zstr_free(&self->manufacturer);
-        if (self->licensing_portal)
-            zstr_free(&self->licensing_portal);
-        if (self->serial)
-            zstr_free(&self->serial);
-        if (self->part_number)
-            zstr_free(&self->part_number);
-        if (self->location)
-            zstr_free(&self->location);
-        if (self->parent_uri)
-            zstr_free(&self->parent_uri);
-        if (self->version)
-            zstr_free(&self->version);
-        if (self->description)
-            zstr_free(&self->description);
-        if (self->contact)
-            zstr_free(&self->contact);
-        if (self->installDate)
-            zstr_free(&self->installDate);
-        if (self->path)
-            zstr_free(&self->path);
-        if (self->protocol_format)
-            zstr_free(&self->protocol_format);
-        if (self->type)
-            zstr_free(&self->type);
-        if (self->txtvers)
-            zstr_free(&self->txtvers);
-        for (size_t i = 0; i < sizeof(self->ip) / sizeof(self->ip[0]); ++i)
-            free(self->ip[i]);
+
+        zstr_free(&self->id);
+        zstr_free(&self->uuid);
+        zstr_free(&self->hostname);
+        zstr_free(&self->name);
+        zstr_free(&self->name_uri);
+        zstr_free(&self->product);
+        zstr_free(&self->vendor);
+        zstr_free(&self->manufacturer);
+        zstr_free(&self->licensing_portal);
+        zstr_free(&self->serial);
+        zstr_free(&self->part_number);
+        zstr_free(&self->location);
+        zstr_free(&self->parent_uri);
+        zstr_free(&self->version);
+        zstr_free(&self->description);
+        zstr_free(&self->contact);
+        zstr_free(&self->installDate);
+        zstr_free(&self->path);
+        zstr_free(&self->protocol_format);
+        zstr_free(&self->type);
+        zstr_free(&self->txtvers);
+
+        const int IP_SIZE = int(sizeof(self->ip) / sizeof(self->ip[0]));
+        for (int i = 0; i < IP_SIZE; i++) {
+            zstr_free(&self->ip[i]);
+        }
+ 
         // Free object itself
         free(self);
         *self_ptr = NULL;
@@ -389,9 +360,7 @@ void ftyinfo_destroy(ftyinfo_t** self_ptr)
 
 const char* ftyinfo_uuid(ftyinfo_t* self)
 {
-    if (!self)
-        return NULL;
-    return self->uuid;
+    return self ? self->uuid : NULL;
 }
 
 const zhash_t* ftyinfo_infohash(ftyinfo_t* self)
