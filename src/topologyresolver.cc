@@ -60,7 +60,7 @@ static std::map<std::string, std::set<std::string>> s_local_addresses()
 {
     std::map<std::string, std::set<std::string>> result;
 
-    struct ifaddrs *interfaces;
+    struct ifaddrs *interfaces = nullptr;
     if (getifaddrs(&interfaces) == -1) {
         return result;
     }
@@ -70,6 +70,7 @@ static std::map<std::string, std::set<std::string>> s_local_addresses()
     for (struct ifaddrs *iface = interfaces; iface; iface = iface->ifa_next) {
         if (!iface->ifa_addr)
             continue;
+        memset(host, 0, sizeof(host));
         int family = iface->ifa_addr->sa_family;
         if (family == AF_INET || family == AF_INET6) {
             if (getnameinfo(iface->ifa_addr,

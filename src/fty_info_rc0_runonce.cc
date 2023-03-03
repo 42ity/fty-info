@@ -219,13 +219,14 @@ static int handle_stream(fty_info_rc0_runonce_t* self, zmsg_t* msgIn)
 
     data = fty_proto_ext_string(message, "ip.1", NULL);
     if (NULL == data) {
-        struct ifaddrs *interfaces, *iface;
+        struct ifaddrs *interfaces = nullptr;
         if (getifaddrs(&interfaces) != -1) {
             char            host[NI_MAXHOST];
             int counter = 0;
-            for (iface = interfaces; iface != NULL; iface = iface->ifa_next) {
+            for (struct ifaddrs *iface = interfaces; iface != NULL; iface = iface->ifa_next) {
                 if (iface->ifa_addr == NULL)
                     continue;
+                memset(host, 0, sizeof(host));
                 // here we support IPv4 only, only get first 3 addresses
                 if (iface->ifa_addr->sa_family == AF_INET && getnameinfo(iface->ifa_addr, sizeof(struct sockaddr_in),
                                                                  host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST) == 0) {
