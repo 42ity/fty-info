@@ -28,14 +28,15 @@
 
 #include "ftyinfo.h"
 #include "fty_info.h"
-#include <cxxtools/jsondeserializer.h>
+#include "cxxtools/serializationinfo.h"
 #include <fstream>
 #include <fty_log.h>
 #include <istream>
 #include <map>
 #include <set>
+#include <fty_common_json.h>
 
-static const char* EV_DATA_DIR = "DATADIR";
+extern const char* EV_DATA_DIR; 
 
 static int s_calendar_to_datetime(time_t timestamp, char* buffer, size_t n)
 {
@@ -87,11 +88,7 @@ static cxxtools::SerializationInfo* s_load_release_details()
 {
     cxxtools::SerializationInfo* si = new cxxtools::SerializationInfo();
     try {
-        std::ifstream              f(RELEASE_DETAILS);
-        std::string                json_string(std::istreambuf_iterator<char>(f), {});
-        std::stringstream          s(json_string);
-        cxxtools::JsonDeserializer json(s);
-        json.deserialize(*si);
+        JSON::readFromFile(RELEASE_DETAILS, *si);
         log_info("fty-info:load %s OK", RELEASE_DETAILS);
     } catch (const std::exception& e) {
         log_error("Error while parsing JSON: %s", e.what());
@@ -115,11 +112,7 @@ static cxxtools::SerializationInfo* s_load_branding_info()
 {
     cxxtools::SerializationInfo* si = new cxxtools::SerializationInfo();
     try {
-        std::ifstream              f(BRANDING_INFO);
-        std::string                json_string(std::istreambuf_iterator<char>(f), {});
-        std::stringstream          s(json_string);
-        cxxtools::JsonDeserializer json(s);
-        json.deserialize(*si);
+        JSON::readFromFile(BRANDING_INFO, *si);
         log_info("fty-info:load %s OK", BRANDING_INFO);
     } catch (const std::exception& e) {
         log_error("Error while parsing JSON: %s", e.what());
