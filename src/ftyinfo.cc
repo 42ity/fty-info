@@ -35,8 +35,7 @@
 #include <map>
 #include <set>
 #include <fty_common_json.h>
-
-extern const char* EV_DATA_DIR; 
+#include <fty_common_str_defs.h>
 
 static int s_calendar_to_datetime(time_t timestamp, char* buffer, size_t n)
 {
