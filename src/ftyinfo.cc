@@ -28,7 +28,7 @@
 
 #include "ftyinfo.h"
 #include "fty_info.h"
-#include "cxxtools/serializationinfo.h"
+#include <cxxtools/serializationinfo.h>
 #include <fstream>
 #include <fty_log.h>
 #include <istream>
