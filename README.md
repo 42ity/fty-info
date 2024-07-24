@@ -62,21 +62,9 @@ In addition to actors, there is one timer:
 
 ### Published metrics
 
-Agent publishes Linux system metrics on FTY_PROTO_STREAM_METRICS, for example:
+Agent publishes Linux system metrics on the shared memory.
 
-```bash
-stream=METRICS
-sender=fty_info_linuxmetrics
-subject=usage.memory@rackcontroller-0
-D: 17-10-17 06:34:24 FTY_PROTO_METRIC:
-D: 17-10-17 06:34:24     aux=
-D: 17-10-17 06:34:24     time=1508222064
-D: 17-10-17 06:34:24     ttl=90
-D: 17-10-17 06:34:24     type='usage.memory'
-D: 17-10-17 06:34:24     name='rackcontroller-0'
-D: 17-10-17 06:34:24     value='40.000000'
-D: 17-10-17 06:34:24     unit='%'
-```
+Example `usage.memory@rackcontroller-0`.
 
 ### Published alerts
 
