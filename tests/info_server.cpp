@@ -1,8 +1,24 @@
+/*  ========================================================================
+    Copyright (C) 2021 Eaton
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+    You should have received a copy of the GNU General Public License along
+    with this program; if not, write to the Free Software Foundation, Inc.,
+    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+    ========================================================================
+*/
+
+#include <catch2/catch.hpp>
 #include "src/fty_info.h"
 #include "src/fty_info_server.h"
 #include "src/ftyinfo.h"
 #include "src/linuxmetric.h"
-#include <catch2/catch.hpp>
 #include <fty_shm.h>
 #include <malamute.h>
 
@@ -70,6 +86,7 @@ TEST_CASE("info server test")
 
         zframe_t* frame_infos = zmsg_next(recv);
         zhash_t*  infos       = zhash_unpack(frame_infos);
+        //frame_infos is owned by recv. Do not destroy!
 
         char* uuid = static_cast<char*>(zhash_lookup(infos, INFO_UUID));
         REQUIRE(uuid);
@@ -293,18 +310,12 @@ TEST_CASE("info server test")
         char*     srv_stype   = zmsg_popstr(recv);
         char*     srv_port    = zmsg_popstr(recv);
         zframe_t* frame_infos = zmsg_next(recv);
-        zhash_t*  infos       = zhash_unpack(frame_infos);
+        zhash_t* infos = zhash_unpack(frame_infos);
 
         char* value = static_cast<char*>(zhash_first(infos)); // first value
         while (value != NULL) {
             char* key = const_cast<char*>(zhash_cursor(infos)); // key of this value
             CHECK(key);
-            // if (streq (key, INFO_NAME))
-            //     assert (streq (value, TST_NAME));
-            // if (streq (key, INFO_NAME_URI))
-            //     assert (streq (value, TST_NAME_URI));
-            // if (streq (key, INFO_LOCATION_URI))
-            //     assert (streq (value, TST_LOCATION2_URI));
             value = static_cast<char*>(zhash_next(infos)); // next value
         }
         zstr_free(&zuuid_reply);
@@ -371,12 +382,6 @@ TEST_CASE("info server test")
         while (value != NULL) {
             char* key = const_cast<char*>(zhash_cursor(infos)); // key of this value
             CHECK(key);
-            // if (streq (key, INFO_NAME))
-            //     assert (streq (value, TST_NAME));
-            // if (streq (key, INFO_NAME_URI))
-            //     assert (streq (value, TST_NAME_URI));
-            // if (streq (key, INFO_LOCATION_URI))
-            //     assert (streq (value, TST_LOCATION2_URI));
             value = static_cast<char*>(zhash_next(infos)); // next value
         }
         zstr_free(&zuuid_reply);
@@ -513,9 +518,9 @@ TEST_CASE("info server test")
             zclock_sleep(1000);
             fty::shm::shmMetrics results;
             fty::shm::read_metrics(".*", ".*", results);
-            assert(results.size() == number_metrics);
+            CHECK(results.size() == number_metrics);
             for (auto& metric : results) {
-                assert(fty_proto_id(metric) == FTY_PROTO_METRIC);
+                CHECK(fty_proto_id(metric) == FTY_PROTO_METRIC);
                 const char* type = fty_proto_type(metric);
                 zhashx_update(metrics, type, fty_proto_dup(metric));
             }
