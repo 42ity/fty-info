@@ -20,6 +20,7 @@
 */
 
 #pragma once
+
 #include "topologyresolver.h"
 
 // default values

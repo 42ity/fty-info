@@ -28,14 +28,16 @@
 
 #include "ftyinfo.h"
 #include "fty_info.h"
+
 #include <cxxtools/serializationinfo.h>
-#include <fstream>
 #include <fty_log.h>
+#include <fty_common_json.h>
+#include <fty_common_str_defs.h>
+
+#include <fstream>
 #include <istream>
 #include <map>
 #include <set>
-#include <fty_common_json.h>
-#include <fty_common_str_defs.h>
 
 static int s_calendar_to_datetime(time_t timestamp, char* buffer, size_t n)
 {
@@ -74,7 +76,8 @@ static void s_get_installation_date(const std::string& file, std::string& instal
             }
             installation_date.assign(chtmp);
         }
-    } catch (const std::exception& e) {
+    }
+    catch (const std::exception& e) {
         installation_date = "N/A - Undefined error occured";
         log_error("Exception caught: %s", e.what());
     }
@@ -89,7 +92,8 @@ static cxxtools::SerializationInfo* s_load_release_details()
     try {
         JSON::readFromFile(RELEASE_DETAILS, *si);
         log_info("fty-info:load %s OK", RELEASE_DETAILS);
-    } catch (const std::exception& e) {
+    }
+    catch (const std::exception& e) {
         log_error("Error while parsing JSON: %s", e.what());
     }
     return si;
@@ -101,7 +105,8 @@ static char* s_get_release_details(cxxtools::SerializationInfo& si, const char* 
         std::string value;
         si.getMember("release-details").getMember(key) >>= value;
         return strdup(value.c_str());
-    } catch (const std::exception& e) {
+    }
+    catch (const std::exception& e) {
         log_error("Problem with getting %s in JSON: %s", key, e.what());
     }
     return dfl ? strdup(dfl) : NULL;
@@ -113,7 +118,8 @@ static cxxtools::SerializationInfo* s_load_branding_info()
     try {
         JSON::readFromFile(BRANDING_INFO, *si);
         log_info("fty-info:load %s OK", BRANDING_INFO);
-    } catch (const std::exception& e) {
+    }
+    catch (const std::exception& e) {
         log_error("Error while parsing JSON: %s", e.what());
     }
     return si;
@@ -125,7 +131,8 @@ static char* s_get_branding_info(cxxtools::SerializationInfo& si, const char* ke
         std::string value;
         si.getMember(key) >>= value;
         return strdup(value.c_str());
-    } catch (const std::exception& e) {
+    }
+    catch (const std::exception& e) {
         log_error("Problem with getting %s in JSON: %s", key, e.what());
     }
     return dfl ? strdup(dfl) : NULL;
@@ -136,17 +143,24 @@ static char* s_get_branding_info(cxxtools::SerializationInfo& si, const char* ke
 
 ftyinfo_t* ftyinfo_new(topologyresolver_t* resolver, const char* path)
 {
-    ftyinfo_t* self = static_cast<ftyinfo_t*>(zmalloc(sizeof(ftyinfo_t)));
+    ftyinfo_t* self = static_cast<ftyinfo_t*>(zmalloc(sizeof(*self)));
+    if (!self) {
+        log_error("ftyinfo_new failed");
+        return NULL;
+    }
+
+    memset(self, 0, sizeof(*self));
 
     self->infos = zhash_new();
 
     // set hostname
     char hostname[HOST_NAME_MAX + 1];
-    int rv = gethostname(hostname, sizeof(hostname));
-    if (rv == -1) {
+    int r = gethostname(hostname, sizeof(hostname));
+    if (r == -1) {
         log_warning("ftyinfo could not be fully initialized (error while getting the hostname)");
         self->hostname = strdup("localhost");
-    } else {
+    }
+    else {
         self->hostname = strdup(hostname);
     }
     log_info("fty-info:hostname  = '%s'", self->hostname);
@@ -181,6 +195,7 @@ ftyinfo_t* ftyinfo_new(topologyresolver_t* resolver, const char* path)
         self->product      = s_get_release_details(*si, "hardware-catalog-number", NULL);
         self->part_number  = s_get_release_details(*si, "hardware-part-number", NULL);
         self->version      = s_get_release_details(*si, "osimage-name", NULL);
+
         log_info("fty-info:uuid         = '%s'", self->uuid);
         log_info("fty-info:vendor       = '%s'", self->vendor);
         log_info("fty-info:manufacturer = '%s'", self->manufacturer);
@@ -193,7 +208,7 @@ ftyinfo_t* ftyinfo_new(topologyresolver_t* resolver, const char* path)
     // get complementary branding info
     cxxtools::SerializationInfo* bi = s_load_branding_info();
     if (bi) {
-        self->licensing_portal          = s_get_branding_info(*bi, "licensing_portal", "N/A");
+        self->licensing_portal = s_get_branding_info(*bi, "licensing_portal", "N/A");
         log_info("fty-info:licensing_portal = '%s'", self->licensing_portal);
     }
 
@@ -204,7 +219,7 @@ ftyinfo_t* ftyinfo_new(topologyresolver_t* resolver, const char* path)
     log_info("fty-info:contact         = '%s'", self->contact);
 
     // set installDate
-    char*       license = s_get_accepted_license_file();
+    char* license = s_get_accepted_license_file();
     std::string datetime;
     s_get_installation_date(license, datetime);
     self->installDate = strdup(datetime.c_str());
@@ -212,18 +227,20 @@ ftyinfo_t* ftyinfo_new(topologyresolver_t* resolver, const char* path)
     zstr_free(&license);
 
     // use default
-    self->path            = strdup(path);
+    self->path = strdup(path);
     self->protocol_format = strdup(TXT_PROTO_FORMAT);
 
     // update type (ipm-va by default)
     std::string s_type = TXT_IPM_VA_TYPE;
     if (self->product) {
-        if (streq(self->product, "IPC3000")) {
-            s_type = TXT_IPC_TYPE;
-        } else if (streq(self->product, "IPM Editions VA")) {
+        if (streq(self->product, "IPM Editions VA")) {
             s_type = TXT_IPM_VA_TYPE;
-        } else if (streq(self->product, "IPM Infra VA") || streq(self->product, "IPC3000E-LXC")) {
+        }
+        else if (streq(self->product, "IPM Infra VA") || streq(self->product, "IPC3000E-LXC")) {
             s_type = TXT_IPC_VA_TYPE;
+        }
+        else if (streq(self->product, "IPC3000")) {
+            s_type = TXT_IPC_TYPE;
         }
     }
     self->type    = strdup(s_type.c_str());
@@ -239,6 +256,7 @@ ftyinfo_t* ftyinfo_new(topologyresolver_t* resolver, const char* path)
     for (int i = 0; i < IP_SIZE; i++) {
         self->ip[i] = NULL;
     }
+
     struct ifaddrs *interfaces = NULL;
     if (getifaddrs(&interfaces) != -1) {
         char host[NI_MAXHOST];
@@ -273,7 +291,11 @@ ftyinfo_t* ftyinfo_new(topologyresolver_t* resolver, const char* path)
 
 ftyinfo_t* ftyinfo_test_new(void)
 {
-    ftyinfo_t* self = static_cast<ftyinfo_t*>(zmalloc(sizeof(ftyinfo_t)));
+    ftyinfo_t* self = static_cast<ftyinfo_t*>(zmalloc(sizeof(*self)));
+    if (!self) return NULL;
+
+    memset(self, 0, sizeof(*self));
+
     // TXT attributes
     self->infos            = zhash_new();
     self->id               = strdup(TST_ID);
@@ -283,7 +305,7 @@ ftyinfo_t* ftyinfo_test_new(void)
     self->name_uri         = strdup(TST_NAME_URI);
     self->product          = strdup(TST_PRODUCT);
     self->vendor           = strdup(TST_VENDOR);
-    // self->manufacturer is skipped!?
+    self->manufacturer     = NULL;
     self->licensing_portal = strdup(TST_LIC_URL);
     self->serial           = strdup(TST_SERIAL);
     self->part_number      = strdup(TST_PART_NUMBER);
@@ -297,6 +319,7 @@ ftyinfo_t* ftyinfo_test_new(void)
     self->protocol_format  = strdup(TXT_PROTO_FORMAT);
     self->type             = strdup(TXT_IPC_TYPE);
     self->txtvers          = strdup(TXT_VER);
+
     return self;
 }
 
@@ -304,12 +327,10 @@ ftyinfo_t* ftyinfo_test_new(void)
 //  --------------------------------------------------------------------------
 //  Destroy the ftyinfo
 
-void ftyinfo_destroy(ftyinfo_t** self_ptr)
+void ftyinfo_destroy(ftyinfo_t** self_p)
 {
-    if (!self_ptr)
-        return;
-    if (*self_ptr) {
-        ftyinfo_t* self = *self_ptr;
+    if (self_p && (*self_p)) {
+        ftyinfo_t* self = *self_p;
 
         // Free class properties here
         zhash_destroy(&self->infos);
@@ -340,10 +361,10 @@ void ftyinfo_destroy(ftyinfo_t** self_ptr)
         for (int i = 0; i < IP_SIZE; i++) {
             zstr_free(&self->ip[i]);
         }
- 
+
         // Free object itself
         free(self);
-        *self_ptr = NULL;
+        *self_p = NULL;
     }
 }
 

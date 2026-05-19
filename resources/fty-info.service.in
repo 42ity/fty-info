@@ -1,5 +1,5 @@
 [Unit]
-Description=fty-info service: serve metrics about this system as rackcontroller-0
+Description=@PROJECT_NAME@ service
 Requires=malamute.service network.target
 After=malamute.service network.target
 Conflicts=rescue.target shutdown.target poweroff.target halt.target reboot.target emergency.target

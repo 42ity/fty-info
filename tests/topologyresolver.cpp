@@ -16,6 +16,7 @@
 
 #include <catch2/catch.hpp>
 #include "src/topologyresolver.h"
+
 #include <malamute.h>
 
 typedef enum
@@ -24,11 +25,11 @@ typedef enum
     UPTODATE
 } ResolverState;
 
+// CAUTION copied AS IS from src/topologyresolver.cc
 struct _topologyresolver_t
 {
     char*         iname;
     char*         topology;
-    const char*   endpoint;
     ResolverState state;
     zhashx_t*     assets;
     mlm_client_t* client;
