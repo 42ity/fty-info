@@ -58,7 +58,7 @@ int main(int argc, char* argv[])
     asprintf(&linuxmetrics_interval, "%d", DEFAULT_LINUXMETRICS_INTERVAL_SEC);
 
     // cleanup
-    #define CLEANUP { \
+    #define CLEANUP_STRINGS { \
         zstr_free(&actor_name); \
         zstr_free(&endpoint); \
         zstr_free(&path); \
@@ -74,7 +74,7 @@ int main(int argc, char* argv[])
 
         if (streq(arg, "-h") || streq(arg, "--help")) {
             usage();
-            CLEANUP;
+            CLEANUP_STRINGS;
             return EXIT_SUCCESS;
         }
         else if (streq(arg, "-v") || streq(arg, "--verbose")) {
@@ -83,7 +83,7 @@ int main(int argc, char* argv[])
         else if (streq(arg, "-c") || streq(arg, "--config")) {
             if (!param) {
                 fprintf(stderr, "Missing argument (option: %s)\n", arg);
-                CLEANUP;
+                CLEANUP_STRINGS;
                 return EXIT_FAILURE;
             }
             config_file = param;
@@ -92,7 +92,7 @@ int main(int argc, char* argv[])
         else if (streq(arg, "-e") || streq(arg, "--endpoint")) {
             if (!param) {
                 fprintf(stderr, "Missing argument (option: %s)\n", arg);
-                CLEANUP;
+                CLEANUP_STRINGS;
                 return EXIT_FAILURE;
             }
             zstr_free(&endpoint);
@@ -101,7 +101,7 @@ int main(int argc, char* argv[])
         }
         else {
             fprintf(stderr, "Unknown option: %s\n", arg);
-            CLEANUP;
+            CLEANUP_STRINGS;
             return EXIT_FAILURE;
         }
     }
@@ -112,7 +112,7 @@ int main(int argc, char* argv[])
         zconfig_t* config = zconfig_load(config_file);
         if (!config) {
             log_error("fty-info: failed to load config file %s: %m", config_file);
-            CLEANUP;
+            CLEANUP_STRINGS;
             return EXIT_FAILURE;
         }
 
@@ -150,7 +150,7 @@ int main(int argc, char* argv[])
     zactor_t* server = zactor_new(fty_info_server, actor_name);
     if (!server) {
         log_error("fty-info-server creation failed");
-        CLEANUP;
+        CLEANUP_STRINGS;
         return EXIT_FAILURE;
     }
     zstr_sendx(server, "PATH", path, NULL);
@@ -166,7 +166,7 @@ int main(int argc, char* argv[])
     if (!rc0_runonce) {
         log_error("fty_info_rc0_runonce creation failed");
         zactor_destroy(&server);
-        CLEANUP;
+        CLEANUP_STRINGS;
         return EXIT_FAILURE;
     }
     zstr_sendx(rc0_runonce, "CONNECT", endpoint, NULL);
@@ -178,7 +178,7 @@ int main(int argc, char* argv[])
         log_error("timer_loop creation failed");
         zactor_destroy(&rc0_runonce);
         zactor_destroy(&server);
-        CLEANUP;
+        CLEANUP_STRINGS;
         return EXIT_FAILURE;
     }
     zloop_timer(timer_loop, size_t(atoi(linuxmetrics_interval) * 1000), 0, s_linuxmetrics_event, server);
@@ -198,7 +198,7 @@ int main(int argc, char* argv[])
     zloop_destroy(&timer_loop);
     zactor_destroy(&rc0_runonce);
     zactor_destroy(&server);
-    CLEANUP;
+    CLEANUP_STRINGS;
 
     return EXIT_SUCCESS;
 }

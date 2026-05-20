@@ -269,6 +269,7 @@ bool topologyresolver_asset(topologyresolver_t* self, fty_proto_t* message)
     }
 
     const char* iname = fty_proto_name(message);
+
     // is this message about me?
     if (!self->iname && s_is_this_me(message)) {
         self->iname = strdup(iname);

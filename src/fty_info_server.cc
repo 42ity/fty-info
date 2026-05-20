@@ -509,7 +509,7 @@ static zmsg_t* s_hw_cap(fty_info_server_t* self, const char* type)
         zmsg_addstr(msg, s_get(cap, "hardware/type", ""));
     }
     else {
-        log_error("unsupported request for '%s'", type);
+        log_error("unsupported request for type '%s'", type);
 
         zmsg_addstr(msg, "ERROR");
         zmsg_addstrf(msg, "unsupported type");
@@ -558,7 +558,8 @@ void static s_handle_mailbox(fty_info_server_t* self, zmsg_t* message)
 
     zmsg_t* reply = NULL;
 
-    // we assume all request command are MAILBOX DELIVER, and with any subject"
+    // we assume all requests are with any subject
+
     if (!command) {
         log_debug("Empty command");
     }
@@ -577,12 +578,9 @@ void static s_handle_mailbox(fty_info_server_t* self, zmsg_t* message)
         reply = s_create_info(info);
         ftyinfo_destroy(&info);
     }
-    else if (streq(command, "ERROR")) {
-        // Don't reply to ERROR messages ?!
-        log_debug("%s: Received ERROR command from '%s', ignoring", self->name, mlm_client_sender(self->client));
-    }
     else {
-        log_warning("%s: Received unexpected command '%s' from '%s'", self->name, command, mlm_client_sender(self->client));
+        log_warning("%s: Rx unexpected command (sender: %s, command: %s, zuuid: %s)",
+            self->name, sender, command, zuuid);
 
         reply = zmsg_new();
         zmsg_addstr(reply, "ERROR");
@@ -590,7 +588,8 @@ void static s_handle_mailbox(fty_info_server_t* self, zmsg_t* message)
     }
 
     if (reply) {
-        zmsg_pushstrf(reply, "%s", zuuid ? zuuid : "missing-uuid"); // enforce reply w/ uuid
+        // enforce reply w/ uuid
+        zmsg_pushstrf(reply, "%s", zuuid ? zuuid : "missing-uuid");
 
         int r = mlm_client_sendto(self->client, sender, "info", NULL, 1000, &reply);
         if (r != 0) {
