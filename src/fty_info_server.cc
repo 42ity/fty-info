@@ -57,7 +57,7 @@ struct fty_info_server_t
     bool                first_announce;
     bool                test;
     topologyresolver_t* resolver;
-    int                 linuxmetrics_interval;
+    int                 linuxmetrics_interval; // seconds
     std::string         root_dir; // directory to be considered / - used for testing
     zhashx_t*           history;
     char*               hw_cap_path;
@@ -86,10 +86,15 @@ static void history_destructor(void** item)
 //  --------------------------------------------------------------------------
 //  Create a new fty_info_server
 
-fty_info_server_t* info_server_new(char* name)
+static void info_server_destroy(fty_info_server_t** self_p); //fwd decl.
+
+static fty_info_server_t* info_server_new(const char* name)
 {
     fty_info_server_t* self = new fty_info_server_t; //root_dir is a std::string!!!
-    assert(self);
+    if (!self) {
+        log_error("info_server_new failed");
+        return NULL;
+    }
 
     //  Initialize class properties here
     self->name            = strdup(name);
@@ -97,9 +102,16 @@ fty_info_server_t* info_server_new(char* name)
     self->announce_client = mlm_client_new();
     self->first_announce  = true;
     self->test            = false;
+    self->linuxmetrics_interval = 30;
     self->history         = zhashx_new();
     self->hw_cap_path     = NULL;
     self->resolver        = topologyresolver_new(DEFAULT_RC_INAME);
+
+    if (!(self->name && self->client && self->announce_client && self->history && self->resolver)) {
+        log_error("info_server_new initialization failed");
+        info_server_destroy(&self);
+        return NULL;
+    }
 
     double* numerator_ptr   = reinterpret_cast<double*>(zmalloc(sizeof(double)));
     double* denominator_ptr = reinterpret_cast<double*>(zmalloc(sizeof(double)));
@@ -111,13 +123,13 @@ fty_info_server_t* info_server_new(char* name)
 }
 
 //  --------------------------------------------------------------------------
-//  Destroy the fty_info_server
+//  Destroy the fty_info_server object
 
-void info_server_destroy(fty_info_server_t** self_p)
+static void info_server_destroy(fty_info_server_t** self_p)
 {
-    assert(self_p);
-    if (*self_p) {
+    if (self_p && (*self_p)) {
         fty_info_server_t* self = *self_p;
+
         //  Free class properties here
         mlm_client_destroy(&self->client);
         mlm_client_destroy(&self->announce_client);
@@ -127,6 +139,7 @@ void info_server_destroy(fty_info_server_t** self_p)
         topologyresolver_destroy(&self->resolver);
         zhashx_destroy(&self->history);
         zstr_free(&self->hw_cap_path);
+
         //  Free object itself
         delete self;
         *self_p = NULL;
@@ -135,6 +148,7 @@ void info_server_destroy(fty_info_server_t** self_p)
 
 // return NAME (uuid first 8 digits)
 // the returned buffer must be freed by caller
+
 static char* s_get_name(ftyinfo_t* info)
 {
     std::string s_name = SRV_IPC_NAME;
@@ -152,7 +166,6 @@ static char* s_get_name(ftyinfo_t* info)
 
     char* buffer = NULL;
     asprintf(&buffer, "%s (%s)", s_name.c_str(), first_digit);
-
     return buffer;
 }
 
@@ -179,6 +192,7 @@ static char* s_get_name(ftyinfo_t* info)
 //          type (meaning device type)
 //          hostname
 //          txtvers
+
 static zmsg_t* s_create_info(ftyinfo_t* info)
 {
     char* srv_name = s_get_name(info);
@@ -205,6 +219,7 @@ static zmsg_t* s_create_info(ftyinfo_t* info)
 //  --------------------------------------------------------------------------
 //  publish INFO announcement on STREAM ANNOUNCE/ANNOUNCE-TEST
 //  subject : CREATE/UPDATE
+
 static void s_publish_announce(fty_info_server_t* self)
 {
     if (!mlm_client_connected(self->announce_client))
@@ -216,24 +231,15 @@ static void s_publish_announce(fty_info_server_t* self)
 
     zmsg_t* msg = s_create_info(info);
 
-    if (self->first_announce) {
-        int r = mlm_client_send(self->announce_client, "CREATE", &msg);
-        if (r != -1) {
-            log_info("publish CREATE msg on ANNOUNCE STREAM");
-            self->first_announce = false;
-        }
-        else {
-            log_error("cant publish CREATE msg on ANNOUNCE STREAM");
-        }
+    const char* subject = self->first_announce ? "CREATE" : "UPDATE";
+
+    int r = mlm_client_send(self->announce_client, subject, &msg);
+    if (r == 0) {
+        log_info("Publish %s msg on ANNOUNCE stream", subject);
+        self->first_announce = false;
     }
     else {
-        int r = mlm_client_send(self->announce_client, "UPDATE", &msg);
-        if (r != -1) {
-            log_info("publish UPDATE msg on ANNOUNCE STREAM");
-        }
-        else {
-            log_error("cant publish UPDATE msg on ANNOUNCE STREAM");
-        }
+        log_error("Failed to publish %s msg on ANNOUNCE stream", subject);
     }
 
     zmsg_destroy(&msg);
@@ -241,10 +247,11 @@ static void s_publish_announce(fty_info_server_t* self)
 }
 
 //  --------------------------------------------------------------------------
-//  publish Linux system info on STREAM METRICS
-static void s_publish_linuxmetrics(fty_info_server_t* self)
+//  publish Linux system info on Shared Memory (shm)
+
+static void s_publish_linuxmetrics(const fty_info_server_t* self)
 {
-    char* rc_iname = topologyresolver_id(self->resolver);
+    char* rc_iname = topologyresolver_id(self->resolver); //asset
     if (!rc_iname) {
         log_error("rc_iname is NULL");
         return;
@@ -253,37 +260,43 @@ static void s_publish_linuxmetrics(fty_info_server_t* self)
     zlistx_t* info = linuxmetric_get_all(self->linuxmetrics_interval, self->history, self->root_dir, self->test);
     if (!info) {
        log_error("info is NULL");
-       free(rc_iname);
+       zstr_free(&rc_iname);
        return;
     }
 
     log_debug("s_publish_linuxmetrics for '%s' (info size: %zu)", rc_iname, (info ? zlistx_size(info) : 0));
 
-    int ttl = 3 * self->linuxmetrics_interval; // in seconds
+    const int ttl = 3 * self->linuxmetrics_interval; // in seconds
+
     linuxmetric_t* metric = static_cast<linuxmetric_t*>(zlistx_first(info));
     while (metric) {
-        char* value = zsys_sprintf("%lf", metric->value);
         log_debug("Publishing metric %s, value %lf, unit %s", metric->type, metric->value, metric->unit);
 
+        char* value = NULL;
+        asprintf(&value, "%lf", metric->value);
         int r = fty::shm::write_metric(rc_iname, metric->type, value, metric->unit, ttl);
+        zstr_free(&value);
+
         if (r == 0) {
             log_trace("Metric %s published", metric->type);
-        } else {
+        }
+        else {
             log_error("Can't publish metric %s (r: %d)", metric->type, r);
         }
+
         linuxmetric_destroy(&metric);
 
         metric = static_cast<linuxmetric_t*>(zlistx_next(info));
-        zstr_free(&value);
     }
 
-    free(rc_iname);
     zlistx_destroy(&info);
+    zstr_free(&rc_iname);
 }
 
 //  --------------------------------------------------------------------------
 //  process pipe message
 //  return true means continue, false means TERM
+
 static bool s_handle_pipe(fty_info_server_t* self, zmsg_t* message)
 {
     bool ret = true;
@@ -295,20 +308,20 @@ static bool s_handle_pipe(fty_info_server_t* self, zmsg_t* message)
         log_warning("Empty command.");
     }
     else if (streq(command, "$TERM")) {
-        log_info("Got $TERM");
+        log_debug("$TERM");
         ret = false;
     }
     else if (streq(command, "CONNECT")) {
         char* endpoint = zmsg_popstr(message);
-
         if (endpoint) {
-            if (!self->test)
-                topologyresolver_set_endpoint(self->resolver, endpoint);
+            if (!self->test) {
+                topologyresolver_connect(self->resolver, endpoint);
+            }
             zstr_free(&self->endpoint);
             self->endpoint = strdup(endpoint);
             log_debug("CONNECT: %s/%s", self->endpoint, self->name);
-            int rv = mlm_client_connect(self->client, self->endpoint, 1000, self->name);
-            if (rv == -1) {
+            int r = mlm_client_connect(self->client, self->endpoint, 1000, self->name);
+            if (r != 0) {
                 log_error("%s: mlm_client_connect failed", self->name);
             }
         }
@@ -316,7 +329,6 @@ static bool s_handle_pipe(fty_info_server_t* self, zmsg_t* message)
     }
     else if (streq(command, "PATH")) {
         char* path = zmsg_popstr(message);
-
         if (path) {
             zstr_free(&self->path);
             self->path = strdup(path);
@@ -327,32 +339,39 @@ static bool s_handle_pipe(fty_info_server_t* self, zmsg_t* message)
     else if (streq(command, "CONSUMER")) {
         char* stream  = zmsg_popstr(message);
         char* pattern = zmsg_popstr(message);
-        int   rv      = mlm_client_set_consumer(self->client, stream, pattern);
-        if (rv == -1) {
-            log_error("%s: can't set consumer on stream '%s', '%s'", self->name, stream, pattern);
+        if (stream && pattern) {
+            log_debug("CONSUMER: %s/%s", stream, pattern);
+            int r = mlm_client_set_consumer(self->client, stream, pattern);
+            if (r != 0) {
+                log_error("%s: can't set consumer on stream '%s', '%s'", self->name, stream, pattern);
+            }
+        }
+        else {
+            log_error("Invalid stream (%s) or pattern (%s)", stream, pattern);
         }
         zstr_free(&pattern);
         zstr_free(&stream);
     }
     else if (streq(command, "PRODUCER")) {
         char* stream = zmsg_popstr(message);
+        log_info("%s: PRODUCER/%s", self->name, stream);
         if (streq(stream, "ANNOUNCE-TEST") || streq(stream, "ANNOUNCE")) {
             self->test = streq(stream, "ANNOUNCE-TEST");
             if (!self->test) {
                 zmsg_t* republish = zmsg_new();
-                int rv = mlm_client_sendto(self->client, AGENT_FTY_ASSET, "REPUBLISH", NULL, 5000, &republish);
+                int r = mlm_client_sendto(self->client, AGENT_FTY_ASSET, "REPUBLISH", NULL, 5000, &republish);
                 zmsg_destroy(&republish);
-                if (rv != 0) {
-                    log_error("%s: cannot send REPUBLISH message", self->name);
+                if (r != 0) {
+                    log_error("%s: can't send REPUBLISH message", self->name);
                 }
                 // no response expected
             }
-            int rv = mlm_client_connect(self->announce_client, self->endpoint, 1000, "fty_info_announce");
-            if (rv == -1) {
-                log_error("fty_info_announce : mlm_client_connect failed\n");
+            int r = mlm_client_connect(self->announce_client, self->endpoint, 1000, "fty_info_announce");
+            if (r != 0) {
+                log_error("fty_info_announce : mlm_client_connect failed");
             }
-            rv = mlm_client_set_producer(self->announce_client, stream);
-            if (rv == -1) {
+            r = mlm_client_set_producer(self->announce_client, stream);
+            if (r != 0) {
                 log_error("%s: can't set producer on stream '%s'", self->name, stream);
             }
             else { // do the first announce
@@ -365,8 +384,8 @@ static bool s_handle_pipe(fty_info_server_t* self, zmsg_t* message)
             s_publish_linuxmetrics(self);
         }
         else {
-            int rv = mlm_client_set_producer(self->client, stream);
-            if (rv == -1) {
+            int r = mlm_client_set_producer(self->client, stream);
+            if (r != 0) {
                 log_error("%s: can't set producer on stream '%s'", self->name, stream);
             }
         }
@@ -375,7 +394,9 @@ static bool s_handle_pipe(fty_info_server_t* self, zmsg_t* message)
     else if (streq(command, "LINUXMETRICSINTERVAL")) {
         char* interval = zmsg_popstr(message);
         log_info("Will be publishing metrics each %s seconds", interval);
-        self->linuxmetrics_interval = static_cast<int>(strtol(interval, NULL, 10));
+        if (interval) {
+            self->linuxmetrics_interval = atoi(interval);
+        }
         zstr_free(&interval);
     }
     else if (streq(command, "ROOT_DIR")) {
@@ -414,10 +435,10 @@ static bool s_handle_pipe(fty_info_server_t* self, zmsg_t* message)
 
 void fty_msg_free_fn(void* data)
 {
-    if (!data)
-        return;
-    fty_proto_t* msg = static_cast<fty_proto_t*>(data);
-    fty_proto_destroy(&msg);
+    if (data) {
+        fty_proto_t* msg = static_cast<fty_proto_t*>(data);
+        fty_proto_destroy(&msg);
+    }
 }
 
 //  --------------------------------------------------------------------------
@@ -430,7 +451,8 @@ static zmsg_t* s_hw_cap(fty_info_server_t* self, const char* type)
 
     zconfig_t* cap = NULL;
     {
-        char* path = zsys_sprintf("%s/%s", self->hw_cap_path, HW_CAP_FILE);
+        char* path = NULL;
+        asprintf(&path, "%s/%s", self->hw_cap_path, HW_CAP_FILE);
         log_debug("loading %s...", path);
         cap = zconfig_load(path);
         zstr_free(&path);
@@ -443,7 +465,8 @@ static zmsg_t* s_hw_cap(fty_info_server_t* self, const char* type)
         zmsg_addstr(msg, "cap does not exist");
     }
     else if (streq(type, "gpi") || streq(type, "gpo")) {
-        char* path  = zsys_sprintf("hardware/%s/count", type);
+        char* path =NULL;
+        asprintf(&path, "hardware/%s/count", type);
         const char* count = s_get(cap, path, "");
         zstr_free(&path);
 
@@ -452,17 +475,20 @@ static zmsg_t* s_hw_cap(fty_info_server_t* self, const char* type)
         zmsg_addstr(msg, count ? count : "0");
 
         if (!streq(count, "0")) {
-            path = zsys_sprintf("hardware/%s/base_address", type);
+            path = NULL;
+            asprintf(&path, "hardware/%s/base_address", type);
             const char* ba = s_get(cap, path, "");
             zstr_free(&path);
             zmsg_addstr(msg, ba);
 
-            path = zsys_sprintf("hardware/%s/offset", type);
+            path = NULL;
+            asprintf(&path, "hardware/%s/offset", type);
             const char* offset = s_get(cap, path, "");
             zstr_free(&path);
             zmsg_addstr(msg, offset);
 
-            path = zsys_sprintf("hardware/%s/mapping", type);
+            path = NULL;
+            asprintf(&path, "hardware/%s/mapping", type);
             zconfig_t* ret = zconfig_locate(cap, path);
             zstr_free(&path);
 
@@ -483,7 +509,7 @@ static zmsg_t* s_hw_cap(fty_info_server_t* self, const char* type)
         zmsg_addstr(msg, s_get(cap, "hardware/type", ""));
     }
     else {
-        log_error("unsupported request for '%s'", type);
+        log_error("unsupported request for type '%s'", type);
 
         zmsg_addstr(msg, "ERROR");
         zmsg_addstrf(msg, "unsupported type");
@@ -532,7 +558,8 @@ void static s_handle_mailbox(fty_info_server_t* self, zmsg_t* message)
 
     zmsg_t* reply = NULL;
 
-    // we assume all request command are MAILBOX DELIVER, and with any subject"
+    // we assume all requests are with any subject
+
     if (!command) {
         log_debug("Empty command");
     }
@@ -551,12 +578,9 @@ void static s_handle_mailbox(fty_info_server_t* self, zmsg_t* message)
         reply = s_create_info(info);
         ftyinfo_destroy(&info);
     }
-    else if (streq(command, "ERROR")) {
-        // Don't reply to ERROR messages ?!
-        log_warning("%s: Received ERROR command from '%s', ignoring", self->name, mlm_client_sender(self->client));
-    }
     else {
-        log_warning("%s: Received unexpected command '%s' from '%s'", self->name, command, mlm_client_sender(self->client));
+        log_warning("%s: Rx unexpected command (sender: %s, command: %s, zuuid: %s)",
+            self->name, sender, command, zuuid);
 
         reply = zmsg_new();
         zmsg_addstr(reply, "ERROR");
@@ -564,10 +588,11 @@ void static s_handle_mailbox(fty_info_server_t* self, zmsg_t* message)
     }
 
     if (reply) {
-        zmsg_pushstrf(reply, "%s", zuuid ? zuuid : "missing-uuid"); // enforce reply w/ uuid
+        // enforce reply w/ uuid
+        zmsg_pushstrf(reply, "%s", zuuid ? zuuid : "missing-uuid");
 
-        int rv = mlm_client_sendto(self->client, sender, "info", NULL, 1000, &reply);
-        if (rv != 0) {
+        int r = mlm_client_sendto(self->client, sender, "info", NULL, 1000, &reply);
+        if (r != 0) {
             log_error("%s: failed to send reply to %s ", self->name, sender);
         }
     }
@@ -590,52 +615,54 @@ void fty_info_server(zsock_t* pipe, void* args)
 
     fty_info_server_t* self = info_server_new(name);
     if (!self) {
-        log_error("info_server_new() failed");
+        log_error("%s: info_server_new() failed", name);
         return;
     }
 
     zpoller_t* poller = zpoller_new(pipe, mlm_client_msgpipe(self->client), NULL);
     if (!poller) {
-        log_error("zpoller_new() failed");
+        log_error("%s: zpoller_new() failed", name);
         info_server_destroy(&self);
         return;
     }
 
-    log_info("fty-info: Started");
-
     zsock_signal(pipe, 0);
+
+    log_info("%s: Started", name);
 
     while (!zsys_interrupted) {
         void* which = zpoller_wait(poller, TIMEOUT_MS);
+
         if (which == NULL) {
             if (zpoller_terminated(poller) || zsys_interrupted) {
                 break;
             }
         }
         else if (which == pipe) {
-            log_trace("which == pipe");
-            zmsg_t* message = zmsg_recv(pipe);
-            bool res = s_handle_pipe(self, message);
-            zmsg_destroy(&message);
+            zmsg_t* msg = zmsg_recv(pipe);
+            bool res = s_handle_pipe(self, msg);
+            zmsg_destroy(&msg);
             if (!res) {
                 break; // $TERM
             }
         }
         else if (which == mlm_client_msgpipe(self->client)) {
-            zmsg_t* message = mlm_client_recv(self->client);
+            zmsg_t* msg = mlm_client_recv(self->client);
             const char* command = mlm_client_command(self->client);
+
             if (streq(command, "STREAM DELIVER")) {
-                s_handle_stream(self, message);
+                s_handle_stream(self, msg);
             }
             else if (streq(command, "MAILBOX DELIVER")) {
-                s_handle_mailbox(self, message);
+                s_handle_mailbox(self, msg);
             }
-            zmsg_destroy(&message);
+
+            zmsg_destroy(&msg);
         }
     }
 
     zpoller_destroy(&poller);
     info_server_destroy(&self);
 
-    log_info("fty-info: Ended");
+    log_info("%s: Ended", name);
 }

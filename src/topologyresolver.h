@@ -20,7 +20,9 @@
 */
 
 #pragma once
+
 #include <fty_proto.h>
+#include <czmq.h>
 
 typedef struct _topologyresolver_t topologyresolver_t;
 
@@ -30,8 +32,8 @@ topologyresolver_t* topologyresolver_new(const char* iname);
 //  Destroy the topologyresolver
 void topologyresolver_destroy(topologyresolver_t** self_p);
 
-//  Set endpoint for Malamute client
-void topologyresolver_set_endpoint(topologyresolver_t* self, const char* endpoint);
+//  connect internal mlm client to endpoint
+void topologyresolver_connect(topologyresolver_t* self, const char* endpoint);
 
 //  get RC internal name
 char* topologyresolver_id(topologyresolver_t* self);
@@ -54,9 +56,5 @@ char* topologyresolver_to_description(topologyresolver_t* self);
 //  Return contact of the asset
 char* topologyresolver_to_contact(topologyresolver_t* self);
 
-//  Return topology as string of friedly names (or NULL if incomplete)
+//  Return topology as string of friendly names (or NULL if incomplete)
 char* topologyresolver_to_string(topologyresolver_t* self, const char* separator = "/");
-
-//  Return zlist of inames starting with asset up to DC
-//  Empty list is returned if the topology is incomplete yet
-zlistx_t* topologyresolver_to_list(topologyresolver_t* self);

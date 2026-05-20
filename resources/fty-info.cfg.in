@@ -1,16 +1,12 @@
-#   fty-info configuration
+#   @PROJECT_NAME@ configuration
 
 server
-    timeout = 10000     #   Client connection timeout, msec
     background = 0      #   Run as background process
     workdir = .         #   Working directory for daemon
     verbose = 0         #   Do verbose logging of activity?
-    announce = 60       #   Frequency of announcements (in seconds)
     check_interval = 30 #   Frequency of Linux metrics (in seconds)
 malamute
     endpoint = ipc://@/malamute #   Malamute endpoint
     address = fty-info          #   Agent address
 parameters
     path = /api/v1/admin/info   #path to get general informations from fty-info
-log
-    config = /etc/fty/ftylog.cfg

@@ -20,12 +20,13 @@
 */
 
 #pragma once
+
 #include <czmq.h>
 
 typedef struct _fty_info_rc0_runonce_t fty_info_rc0_runonce_t;
 
 //  Create a new fty_info_rc0_runonce
-fty_info_rc0_runonce_t* fty_info_rc0_runonce_new(char* name);
+fty_info_rc0_runonce_t* fty_info_rc0_runonce_new(const char* name);
 
 //  Destroy the fty_info_rc0_runonce
 void fty_info_rc0_runonce_destroy(fty_info_rc0_runonce_t** self_p);

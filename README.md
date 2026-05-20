@@ -155,6 +155,7 @@ where:
 
 Example `bmsg` request:
 ```bash
+bmsg request fty-info REQUEST HW_CAP 1234 type
 bmsg request fty-info REQUEST HW_CAP 1234 gpi
 bmsg request fty-info REQUEST HW_CAP 1234 gpo
 ```
