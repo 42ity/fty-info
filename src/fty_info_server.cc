@@ -199,7 +199,7 @@ static zmsg_t* s_create_info(ftyinfo_t* info)
 
     zmsg_t* msg = zmsg_new();
     zmsg_addstr(msg, FTY_INFO_CMD);
-    zmsg_addstr(msg, srv_name ? srv_name : DEFAULT_UUID);
+    zmsg_addstr(msg, srv_name ? subs_ipm2dit(srv_name).c_str() : DEFAULT_UUID);
     zmsg_addstr(msg, SRV_TYPE);
     zmsg_addstr(msg, SRV_STYPE);
     zmsg_addstr(msg, SRV_PORT);

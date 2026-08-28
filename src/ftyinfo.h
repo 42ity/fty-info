@@ -22,6 +22,7 @@
 #pragma once
 
 #include "topologyresolver.h"
+#include <string>
 
 // default values
 #define SRV_IPC_NAME     "IPC"
@@ -91,6 +92,9 @@ struct _ftyinfo_t
     char*    type;
     char*    txtvers;
     char*    ip[3];
+
+    //DIT Lite aux
+    char* name2, *product2, *version2;
 };
 
 typedef struct _ftyinfo_t ftyinfo_t;
@@ -103,7 +107,9 @@ ftyinfo_t* ftyinfo_test_new(void);
 //  Destroy the ftyinfo
 void ftyinfo_destroy(ftyinfo_t** self_p);
 
-// getters
+// tools & getters
+std::string subs_ipm2dit(const char* sIn);
+
 const char* ftyinfo_uuid(ftyinfo_t* self);
 
 const zhash_t* ftyinfo_infohash(ftyinfo_t* self);

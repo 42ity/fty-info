@@ -362,10 +362,40 @@ void ftyinfo_destroy(ftyinfo_t** self_p)
             zstr_free(&self->ip[i]);
         }
 
+        zstr_free(&self->name2);
+        zstr_free(&self->product2);
+        zstr_free(&self->version2);
+
         // Free object itself
         free(self);
         *self_p = NULL;
     }
+}
+
+//  --------------------------------------------------------------------------
+// new DIT Lite product naming
+
+std::string subs_ipm2dit(const char* sIn)
+{
+    // subs tokens
+    static const std::vector<std::pair<std::string, std::string>> dict = {
+        {"IPM Editions VA", "Brightlayer DIT Lite"},
+        {"IPM_Editions-vadevel", "DIT-Lite-devel"},
+        {"IPM_Editions-va", "DIT-Lite"},
+    };
+
+    std::string s{sIn ? sIn : ""};
+    for (auto& d : dict) {
+        auto& token{d.first};
+        auto& value{d.second};
+
+        std::size_t pos = s.find(token, 0);
+        while (pos != std::string::npos) {
+            s.replace(pos, token.size(), value);
+            pos = s.find(token, pos + value.size());
+        }
+    }
+    return s;
 }
 
 //  --------------------------------------------------------------------------
@@ -390,8 +420,11 @@ const zhash_t* ftyinfo_infohash(ftyinfo_t* self)
         zhash_insert(self->infos, INFO_UUID, self->uuid);
     if (self->hostname)
         zhash_insert(self->infos, INFO_HOSTNAME, self->hostname);
-    if (self->name)
-        zhash_insert(self->infos, INFO_NAME, self->name);
+    if (self->name) {
+        zstr_free(&self->name2);
+        self->name2 = strdup(subs_ipm2dit(self->name).c_str());
+        zhash_insert(self->infos, INFO_NAME, self->name2);
+    }
     if (self->name_uri)
         zhash_insert(self->infos, INFO_NAME_URI, self->name_uri);
     if (self->vendor)
@@ -400,8 +433,11 @@ const zhash_t* ftyinfo_infohash(ftyinfo_t* self)
         zhash_insert(self->infos, INFO_LICENSING_PORTAL, self->licensing_portal);
     if (self->manufacturer)
         zhash_insert(self->infos, INFO_MANUFACTURER, self->manufacturer);
-    if (self->product)
-        zhash_insert(self->infos, INFO_PRODUCT, self->product);
+    if (self->product) {
+        zstr_free(&self->product2);
+        self->product2 = strdup(subs_ipm2dit(self->product).c_str());
+        zhash_insert(self->infos, INFO_PRODUCT, self->product2);
+    }
     if (self->serial)
         zhash_insert(self->infos, INFO_SERIAL, self->serial);
     if (self->part_number)
@@ -410,8 +446,11 @@ const zhash_t* ftyinfo_infohash(ftyinfo_t* self)
         zhash_insert(self->infos, INFO_LOCATION, self->location);
     if (self->parent_uri)
         zhash_insert(self->infos, INFO_PARENT_URI, self->parent_uri);
-    if (self->version)
-        zhash_insert(self->infos, INFO_VERSION, self->version);
+    if (self->version) {
+        zstr_free(&self->version2);
+        self->version2 = strdup(subs_ipm2dit(self->version).c_str());
+        zhash_insert(self->infos, INFO_VERSION, self->version2);
+    }
     if (self->description)
         zhash_insert(self->infos, INFO_DESCRIPTION, self->description);
     if (self->contact)
