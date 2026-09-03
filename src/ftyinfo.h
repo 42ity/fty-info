@@ -93,8 +93,10 @@ struct _ftyinfo_t
     char*    txtvers;
     char*    ip[3];
 
-    //DIT Lite aux
-    char* name2, *product2, *version2;
+    //DIT Lite naming (auxiliaries)
+    char* name2;
+    char* product2;
+    char* version2;
 };
 
 typedef struct _ftyinfo_t ftyinfo_t;
