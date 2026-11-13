@@ -39,11 +39,6 @@
 #include <map>
 #include <set>
 
-#ifdef __COVERITY__
-ftyinfo_t* ftyinfo_new(topologyresolver_t* r, const char* p) { __coverity_alloc_nosize__(); }
-void ftyinfo_destroy(ftyinfo_t** p) { __coverity_free__(*p); }
-#endif
-
 static int s_calendar_to_datetime(time_t timestamp, char* buffer, size_t n)
 {
     struct tm* tmp = gmtime(&timestamp);
