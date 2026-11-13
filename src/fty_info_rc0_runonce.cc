@@ -35,6 +35,11 @@
 #include <fty_common.h>
 #include <malamute.h>
 
+#ifdef __COVERITY__
+ftyinfo_t* ftyinfo_new(topologyresolver_t* r, const char* p) { __coverity_alloc_nosize__(); }
+void ftyinfo_destroy(ftyinfo_t** p) { __coverity_free__(*p); }
+#endif
+
 //  Structure of our class
 
 struct _fty_info_rc0_runonce_t
