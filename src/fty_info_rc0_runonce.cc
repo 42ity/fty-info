@@ -46,6 +46,13 @@ struct _fty_info_rc0_runonce_t
 };
 
 //  --------------------------------------------------------------------------
+
+#ifdef __COVERITY__
+fty_info_rc0_runonce_t* fty_info_rc0_runonce_new(const char* n) { __coverity_alloc_nosize__(); }
+void fty_info_rc0_runonce_destroy(fty_info_rc0_runonce_t** p) { __coverity_free__(*p); }
+#endif
+
+//  --------------------------------------------------------------------------
 //  Create a new fty_info_rc0_runonce
 
 fty_info_rc0_runonce_t* fty_info_rc0_runonce_new(const char* name)

@@ -52,6 +52,11 @@ struct _topologyresolver_t
     mlm_client_t* client;
 };
 
+#ifdef __COVERITY__
+topologyresolver_t* topologyresolver_new(const char* p) { __coverity_alloc_nosize__(); }
+void topologyresolver_destroy(topologyresolver_t** p) { __coverity_free__(*p); }
+#endif
+
 static std::map<std::string, std::set<std::string>> s_local_addresses()
 {
     std::map<std::string, std::set<std::string>> result;
