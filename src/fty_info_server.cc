@@ -84,6 +84,13 @@ static void history_destructor(void** item)
 }
 
 //  --------------------------------------------------------------------------
+
+#ifdef __COVERITY__
+static fty_info_server_t* info_server_new(const char* n) { __coverity_alloc_nosize__(); }
+static void info_server_destroy(fty_info_server_t** p) { __coverity_free__(*p); }
+#endif
+
+//  --------------------------------------------------------------------------
 //  Create a new fty_info_server
 
 static void info_server_destroy(fty_info_server_t** self_p); //fwd decl.
