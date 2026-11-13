@@ -36,6 +36,10 @@
 #include <sys/statvfs.h>
 #include <filesystem>
 
+#ifdef __COVERITY__
+ftyinfo_t* ftyinfo_new(topologyresolver_t* r, const char* p) { __coverity_alloc_nosize__(); }
+void ftyinfo_destroy(ftyinfo_t** p) { __coverity_free__(*p); }
+#endif
 
 ///////////////////////////////////////////
 // Static functions which parse /proc files

@@ -46,6 +46,11 @@
 
 #define HW_CAP_FILE "42ity-capabilities.dsc"
 
+#ifdef __COVERITY__
+ftyinfo_t* ftyinfo_new(topologyresolver_t* r, const char* p) { __coverity_alloc_nosize__(); }
+void ftyinfo_destroy(ftyinfo_t** p) { __coverity_free__(*p); }
+#endif
+
 struct fty_info_server_t
 {
     //  Declare class properties here

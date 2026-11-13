@@ -115,8 +115,3 @@ std::string subs_ipm2dit(const char* sIn);
 const char* ftyinfo_uuid(ftyinfo_t* self);
 
 const zhash_t* ftyinfo_infohash(ftyinfo_t* self);
-
-#ifdef __COVERITY__
-ftyinfo_t* ftyinfo_new(topologyresolver_t* r, const char* p) { __coverity_alloc_nosize__(); }
-void ftyinfo_destroy(ftyinfo_t** p) { __coverity_free__(*p); }
-#endif
