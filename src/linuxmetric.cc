@@ -41,6 +41,11 @@ ftyinfo_t* ftyinfo_new(topologyresolver_t* r, const char* p) { __coverity_alloc_
 void ftyinfo_destroy(ftyinfo_t** p) { __coverity_free__(*p); }
 #endif
 
+#ifdef __COVERITY__
+linuxmetric_t* linuxmetric_new(void) { __coverity_alloc_nosize__(); }
+void linuxmetric_destroy(linuxmetric_t** p) { __coverity_free__(*p); }
+#endif
+
 ///////////////////////////////////////////
 // Static functions which parse /proc files
 //////////////////////////////////////////
