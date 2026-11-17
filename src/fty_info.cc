@@ -50,20 +50,21 @@ static void usage()
 int main(int argc, char* argv[])
 {
     bool  verbose    = false;
+
     char* actor_name = NULL;
     char* endpoint   = NULL;
     char* path       = NULL;
-    char* linuxmetrics_interval = NULL; // Linux metrics publishing interval (seconds)
+    char* interval   = NULL; // Linux metrics publishing interval (seconds)
 
-    asprintf(&linuxmetrics_interval, "%d", DEFAULT_LINUXMETRICS_INTERVAL_SEC);
+    asprintf(&interval, "%d", DEFAULT_LINUXMETRICS_INTERVAL_SEC);
 
     // cleanup
-    #define CLEANUP_STRINGS { \
+    #define CLEANUP_STRINGS do { \
         zstr_free(&actor_name); \
         zstr_free(&endpoint); \
         zstr_free(&path); \
-        zstr_free(&linuxmetrics_interval); \
-    }
+        zstr_free(&interval); \
+    } while(0)
 
     const char* config_file = NULL;
 
@@ -120,12 +121,12 @@ int main(int argc, char* argv[])
             verbose = true;
         }
 
-        zstr_free(&linuxmetrics_interval);
+        zstr_free(&interval);
         zstr_free(&actor_name);
         zstr_free(&endpoint);
         zstr_free(&path);
 
-        linuxmetrics_interval = strdup(s_get(config, "server/check_interval", "30"));
+        interval   = strdup(s_get(config, "server/check_interval", "30"));
         actor_name = strdup(s_get(config, "malamute/address", FTY_INFO_AGENT));
         endpoint   = strdup(s_get(config, "malamute/endpoint", MLM_ENDPOINT));
         path       = strdup(s_get(config, "parameters/path", DEFAULT_PATH));
@@ -142,8 +143,8 @@ int main(int argc, char* argv[])
     if (!actor_name) { actor_name = strdup(FTY_INFO_AGENT); }
     if (!endpoint) { endpoint = strdup(MLM_ENDPOINT); }
     if (!path) { path = strdup(DEFAULT_PATH); }
-    if (!linuxmetrics_interval) {
-        asprintf(&linuxmetrics_interval, "%d", DEFAULT_LINUXMETRICS_INTERVAL_SEC);
+    if (!interval) {
+        asprintf(&interval, "%d", DEFAULT_LINUXMETRICS_INTERVAL_SEC);
     }
 
     // server configuration
@@ -159,7 +160,7 @@ int main(int argc, char* argv[])
     zstr_sendx(server, "CONSUMER", FTY_PROTO_STREAM_ASSETS, ".*", NULL);
     zstr_sendx(server, "PRODUCER", "ANNOUNCE", NULL);
     zstr_sendx(server, "ROOT_DIR", "/", NULL);
-    zstr_sendx(server, "LINUXMETRICSINTERVAL", linuxmetrics_interval, NULL);
+    zstr_sendx(server, "LINUXMETRICSINTERVAL", interval, NULL);
 
     // Run once actor to fill data about rackcontroller-0 asset
     zactor_t* rc0_runonce = zactor_new(fty_info_rc0_runonce, const_cast<char*>(RC0_RUNONCE_ACTOR));
@@ -181,7 +182,7 @@ int main(int argc, char* argv[])
         CLEANUP_STRINGS;
         return EXIT_FAILURE;
     }
-    zloop_timer(timer_loop, size_t(atoi(linuxmetrics_interval) * 1000), 0, s_linuxmetrics_event, server);
+    zloop_timer(timer_loop, size_t(atoi(interval)) * 1000, 0, s_linuxmetrics_event, server);
     zloop_start(timer_loop);
 
     // Main loop, accept any message back from server
