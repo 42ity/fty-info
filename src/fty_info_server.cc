@@ -100,6 +100,10 @@ static fty_info_server_t* info_server_new(const char* n) { __coverity_alloc_nosi
 static void info_server_destroy(fty_info_server_t** p) { __coverity_free__(*p); }
 #endif
 
+#ifdef __COVERITY__
+void zhashx_insert(zhashx_t *self, const void *key, void *item) { __coverity_escape__(item); }
+#endif
+
 //  --------------------------------------------------------------------------
 //  Create a new fty_info_server
 

@@ -141,7 +141,7 @@ static int handle_stream(fty_info_rc0_runonce_t* self, zmsg_t* msgIn)
     }
 
     const char* iname = fty_proto_name(message);
-    if (!iname || !streq(iname, DEFAULT_RC_INAME)) {
+    if (!iname || !streq(DEFAULT_RC_INAME, iname)) {
         log_debug("Not %s", DEFAULT_RC_INAME);
         fty_proto_destroy(&message);
         return 0;

@@ -46,6 +46,10 @@ linuxmetric_t* linuxmetric_new(void) { __coverity_alloc_nosize__(); }
 void linuxmetric_destroy(linuxmetric_t** p) { __coverity_free__(*p); }
 #endif
 
+#ifdef __COVERITY__
+void zhashx_insert(zhashx_t *self, const void *key, void *item) { __coverity_escape__(item); }
+#endif
+
 ///////////////////////////////////////////
 // Static functions which parse /proc files
 //////////////////////////////////////////
